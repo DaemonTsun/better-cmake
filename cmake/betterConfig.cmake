@@ -1,5 +1,5 @@
 
-# version 1.0
+# version 1.1
 
 # by default color output is only generated for Make for some reason
 add_compile_options (-fdiagnostics-color=always)
@@ -52,4 +52,26 @@ macro(install_executable)
     endif()
 
     install(TARGETS "${INSTALL_EXECUTABLE_TARGET}" DESTINATION bin)
+endmacro()
+
+macro(export_library_variables NAME)
+    if (DEFINED ${NAME}_VERSION)
+        set(${NAME}_VERSION ${${NAME}_VERSION} PARENT_SCOPE)
+    endif()
+    
+    if (DEFINED ${NAME}_TARGET)
+        set(${NAME}_TARGET ${${NAME}_TARGET} PARENT_SCOPE)
+    endif()
+
+    if (DEFINED ${NAME}_SOURCES_DIR)
+        set(${NAME}_SOURCES_DIR "${${NAME}_SOURCES_DIR}" PARENT_SCOPE)
+    endif()
+
+    if (DEFINED ${NAME}_SOURCES)
+        set(${NAME}_SOURCES ${${NAME}_SOURCES} PARENT_SCOPE)
+    endif()
+
+    if (DEFINED ${NAME}_HEADERS)
+        set(${NAME}_HEADERS ${${NAME}_HEADERS} PARENT_SCOPE)
+    endif()
 endmacro()
