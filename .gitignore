@@ -1,0 +1,10 @@
+
+**.kdev4
+*.kdev4
+bin/
+
+*.swp
+**.swp
+*.kate-swp
+**.kate-swp
+*.directory
