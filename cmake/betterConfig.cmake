@@ -219,24 +219,32 @@ macro(generate_target_header NAME VNAME OUT_PATH)
     unset(_HEADER)
 endmacro()
 
-# target_cpp_warnings: enables C(++) compiler warnings
-macro(target_cpp_warnings TARGET)
-    set(_OPTIONS ALL EXTRA PEDANTIC)
+# get_cpp_warnings: get a list of cpp warnings from ARGN
+macro(get_cpp_warnings OUT_VAR)
+    set(_OPTIONS ALL EXTRA PEDANTIC SANE)
     set(_SINGLE_VAL_ARGS)
     set(_MULTI_VAL_ARGS)
 
     cmake_parse_arguments(TARGET_CPP_WARNINGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
     
     if (TARGET_CPP_WARNINGS_ALL)
-        target_compile_options(${TARGET} PRIVATE -Wall)
+        list(APPEND ${OUT_VAR} -Wall)
     endif()
 
     if (TARGET_CPP_WARNINGS_EXTRA)
-        target_compile_options(${TARGET} PRIVATE -Wextra)
+        list(APPEND ${OUT_VAR} -Wextra)
     endif()
 
     if (TARGET_CPP_WARNINGS_PEDANTIC)
-        target_compile_options(${TARGET} PRIVATE -Wpedantic)
+        list(APPEND ${OUT_VAR} -Wpedantic)
+    endif()
+
+    if (TARGET_CPP_WARNINGS_SANE)
+        list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable)
+    endif()
+
+    if (DEFINED TARGET_CPP_WARNINGS_UNPARSED_ARGUMENTS)
+        list(APPEND ${OUT_VAR} ${TARGET_CPP_WARNINGS_UNPARSED_ARGUMENTS})
     endif()
 endmacro()
 
@@ -410,9 +418,14 @@ macro(add_lib NAME LINKAGE)
         endif()
 
         target_cpp_version("${_NAME}_CPP_VERSION" "${_NAME}" ${ADD_LIB_CPP_VERSION})
+        set("${_NAME}_CPP_WARNINGS" "")
 
         if (DEFINED ADD_LIB_CPP_WARNINGS)
-            target_cpp_warnings("${_NAME}" ${ADD_LIB_CPP_WARNINGS})
+            get_cpp_warnings("${_NAME}_CPP_WARNINGS" ${ADD_LIB_CPP_WARNINGS})
+        endif()
+
+        if (${_NAME}_CPP_WARNINGS)
+            target_compile_options("${_NAME}" PRIVATE ${${_NAME}_CPP_WARNINGS})
         endif()
 
         if (DEFINED ADD_LIB_INCLUDE_DIRS)
@@ -454,12 +467,12 @@ macro(add_lib NAME LINKAGE)
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
-                                CPP_WARNINGS ${ADD_LIB_CPP_WARNINGS}
+                                CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 )
                         else()
                             add_test("${_TEST}"
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
-                                CPP_WARNINGS ${ADD_LIB_CPP_WARNINGS}
+                                CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES})
                         endif()
