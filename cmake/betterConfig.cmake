@@ -1,8 +1,8 @@
 
-# version 1.3
+# version 1.4
 
 set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 3)
+set(BETTER_CMAKE_VERSION_MINOR 4)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -94,7 +94,7 @@ endmacro()
 # usage: install_executable(TARGET <target>)
 macro(install_executable)
     set(_OPTIONS)
-    set(_SINGLE_VAL_ARGS TARGET)
+    set(_SINGLE_VAL_ARGS TARGET NAME)
     set(_MULTI_VAL_ARGS)
 
     cmake_parse_arguments(INSTALL_EXECUTABLE "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
@@ -103,10 +103,19 @@ macro(install_executable)
         message(FATAL_ERROR "install_executable: missing TARGET")
     endif()
 
+    if (DEFINED INSTALL_EXECUTABLE_NAME)
+        add_custom_command(TARGET "${INSTALL_EXECUTABLE_TARGET}" POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_TARGET}"
+            "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}")
+
+        install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}" DESTINATION bin)
+    endif()
+
     install(TARGETS "${INSTALL_EXECUTABLE_TARGET}" DESTINATION bin)
 endmacro()
 
-macro(export_library_variables NAME)
+macro(export_target_variables NAME)
     set_export(${NAME}_VERSION)
     set_export(${NAME}_VERSION_MAJOR)
     set_export(${NAME}_VERSION_MINOR)
@@ -122,7 +131,7 @@ macro(_unversion_variable NAME VNAME VAR)
     set("${NAME}${VAR}" "${${VNAME}${VAR}}")
 endmacro()
 
-macro(unversion_library_variables NAME VNAME)
+macro(unversion_target_variables NAME VNAME)
     set(${NAME}_TARGET ${VNAME})
     _unversion_variable(${NAME} ${VNAME} _VERSION)
     _unversion_variable(${NAME} ${VNAME} _VERSION_MAJOR)
@@ -276,6 +285,7 @@ endmacro()
 # prints: a b c
 #         d e f
 macro(parse_arguments_by_delimiter OUT_VAR DELIM)
+    set(${OUT_VAR} "")
     set(INDEX 0)
     set(_ARGN ${ARGN}) # huh
     list(SUBLIST _ARGN 1 -1 _ARGN)
@@ -337,7 +347,7 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
             message(FATAL_ERROR "add_external_dependency: external dependency ${EXTNAME} did not define required variable ${_EXTNAME}_SOURCES_DIR needed for include paths.")
         endif()
 
-        include_directories("${TARGET}" PRIVATE "${${_EXTNAME}_SOURCES_DIR}")
+        target_include_directories("${TARGET}" PRIVATE "${${_EXTNAME}_SOURCES_DIR}")
         list(APPEND "${TARGET}_INCLUDE_DIRECTORIES" "${${_EXTNAME}_SOURCES_DIR}")
     endif()
 
@@ -346,12 +356,98 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
     endif()
 endmacro()
 
-macro(_add_lib_exts TARGET)
+macro(_add_target_ext TARGET)
     parse_arguments_by_delimiter(_GROUPS LIB ${ARGN})
 
     foreach (ARGS ${_GROUPS})
         add_external_dependency(${TARGET} ${ARGS})
     endforeach()
+endmacro()
+
+macro(_add_target NAME)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS
+        VERSION                 # version of the target
+        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
+        GENERATE_TARGET_HEADER  # path to target header file
+        CPP_VERSION             # defaults to 20 if omitted
+        )
+    set(_MULTI_VAL_ARGS
+        CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
+        SOURCES                 # extra sources, optional
+        INCLUDE_DIRS            # extra include directories, optional
+        LIBRARIES               # libraries to link
+        EXT                     # external dependencies
+        TESTS
+        )
+
+    cmake_parse_arguments(_ADD_TARGET "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (NOT DEFINED _ADD_TARGET_VERSION)
+        set(_ADD_TARGET_VERSION 0.0.0)
+    endif()
+
+    split_version_string(${_ADD_TARGET_VERSION} _MAJOR _MINOR _PATCH)
+    get_version_name(_NAME "${NAME}" "${_MAJOR}.${_MINOR}.${_PATCH}")
+
+    # set versions
+    set("${_NAME}_VERSION" "${_MAJOR}.${_MINOR}.${_PATCH}")
+    set("${_NAME}_VERSION_MAJOR" "${_MAJOR}")
+    set("${_NAME}_VERSION_MINOR" "${_MINOR}")
+    set("${_NAME}_VERSION_PATCH" "${_PATCH}")
+
+    if (NOT DEFINED _ADD_TARGET_SOURCES_DIR)
+        if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+            message(VERBOSE "better-cmake: using default source directory ${CMAKE_CURRENT_SOURCE_DIR}/src/")
+            set(${_NAME}_SOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+        else()
+            message(FATAL_ERROR "better-cmake: add_lib/add_exe requires parameter SOURCES_DIR")
+        endif()
+    else()
+        set(${_NAME}_SOURCES_DIR "${_ADD_TARGET_SOURCES_DIR}")
+    endif()
+
+    if (DEFINED _ADD_TARGET_GENERATE_TARGET_HEADER)
+        generate_target_header("${NAME}" "${_NAME}" "${_ADD_TARGET_GENERATE_TARGET_HEADER}")
+    endif()
+
+    find_sources("${_NAME}_SOURCES" "${${_NAME}_SOURCES_DIR}")
+    find_headers("${_NAME}_HEADERS" "${${_NAME}_SOURCES_DIR}")
+
+    target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES} ${_ADD_TARGET_SOURCES})
+
+    if (NOT DEFINED _ADD_TARGET_CPP_VERSION)
+        set(_ADD_TARGET_CPP_VERSION 20)
+    endif()
+
+    target_cpp_version("${_NAME}_CPP_VERSION" "${_NAME}" ${_ADD_TARGET_CPP_VERSION})
+    set("${_NAME}_CPP_WARNINGS" "")
+
+    if (DEFINED _ADD_TARGET_CPP_WARNINGS)
+        get_cpp_warnings("${_NAME}_CPP_WARNINGS" ${_ADD_TARGET_CPP_WARNINGS})
+    endif()
+
+    if (${_NAME}_CPP_WARNINGS)
+        target_compile_options("${_NAME}" PRIVATE ${${_NAME}_CPP_WARNINGS})
+    endif()
+
+    if (DEFINED _ADD_TARGET_INCLUDE_DIRS)
+        list(APPEND "${_NAME}_INCLUDE_DIRECTORIES" ${_ADD_TARGET_INCLUDE_DIRS})
+    endif()
+
+    if (DEFINED _ADD_TARGET_LIBRARIES)
+        list(APPEND "${_NAME}_LIBRARIES" ${_ADD_TARGET_LIBRARIES})
+    endif()
+
+    if (DEFINED _ADD_TARGET_EXT)
+        _add_target_ext("${_NAME}" ${_ADD_TARGET_EXT})
+    endif()
+
+    target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES})
+
+    if (DEFINED "${_NAME}_LIBRARIES")
+        target_link_libraries("${_NAME}" PRIVATE ${${_NAME}_LIBRARIES})
+    endif()
 endmacro()
 
 macro(add_lib NAME LINKAGE)
@@ -385,75 +481,18 @@ macro(add_lib NAME LINKAGE)
     else()
         # different version, add it
 
-        # set versions
-        set("${_NAME}_VERSION" "${_MAJOR}.${_MINOR}.${_PATCH}")
-        set("${_NAME}_VERSION_MAJOR" "${_MAJOR}")
-        set("${_NAME}_VERSION_MINOR" "${_MINOR}")
-        set("${_NAME}_VERSION_PATCH" "${_PATCH}")
-
         add_library("${_NAME}" ${LINKAGE})
-    
-        if (NOT DEFINED ADD_LIB_SOURCES_DIR)
-            if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-                message(VERBOSE "better-cmake: using default source directory ${CMAKE_CURRENT_SOURCE_DIR}/src/")
-                set(${_NAME}_SOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-            else()
-                message(FATAL_ERROR "better-cmake: add_lib requires parameter SOURCES_DIR")
-            endif()
-        else()
-            set(${_NAME}_SOURCES_DIR "${ADD_LIB_SOURCES_DIR}")
-        endif()
-
-        if (DEFINED ADD_LIB_GENERATE_TARGET_HEADER)
-            generate_target_header("${NAME}" "${_NAME}" "${ADD_LIB_GENERATE_TARGET_HEADER}")
-        endif()
-
-        find_sources("${_NAME}_SOURCES" "${${_NAME}_SOURCES_DIR}")
-        find_headers("${_NAME}_HEADERS" "${${_NAME}_SOURCES_DIR}")
-
-        target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES} ${ADD_LIB_SOURCES})
-
-        if (NOT DEFINED ADD_LIB_CPP_VERSION)
-            set(ADD_LIB_CPP_VERSION 20)
-        endif()
-
-        target_cpp_version("${_NAME}_CPP_VERSION" "${_NAME}" ${ADD_LIB_CPP_VERSION})
-        set("${_NAME}_CPP_WARNINGS" "")
-
-        if (DEFINED ADD_LIB_CPP_WARNINGS)
-            get_cpp_warnings("${_NAME}_CPP_WARNINGS" ${ADD_LIB_CPP_WARNINGS})
-        endif()
-
-        if (${_NAME}_CPP_WARNINGS)
-            target_compile_options("${_NAME}" PRIVATE ${${_NAME}_CPP_WARNINGS})
-        endif()
-
-        if (DEFINED ADD_LIB_INCLUDE_DIRS)
-            list(APPEND "${_NAME}_INCLUDE_DIRECTORIES" ${ADD_LIB_LIBRARIES})
-        endif()
-
-        if (DEFINED ADD_LIB_LIBRARIES)
-            list(APPEND "${_NAME}_LIBRARIES" ${ADD_LIB_LIBRARIES})
-        endif()
 
         if (ADD_LIB_PIE)
             set_property(TARGET "${_NAME}" PROPERTY POSITION_INDEPENDENT_CODE ON)
         endif()
 
-        if (DEFINED ADD_LIB_EXT)
-            _add_lib_exts("${_NAME}" ${ADD_LIB_EXT})
-        endif()
-
-        target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" "${${_NAME}_INCLUDE_DIRECTORIES}")
-
-        if (DEFINED "${_NAME}_LIBRARIES")
-            target_link_libraries("${_NAME}" PRIVATE ${${_NAME}_LIBRARIES})
-        endif()
+        _add_target("${NAME}" ${ARGN})
 
         if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-            export_library_variables("${_NAME}")
+            export_target_variables("${_NAME}")
         else()
-            unversion_library_variables("${NAME}" "${_NAME}")
+            unversion_target_variables("${NAME}" "${_NAME}")
 
             install_library(TARGET "${_NAME}" HEADERS ${${_NAME}_HEADERS})
 
@@ -471,10 +510,82 @@ macro(add_lib NAME LINKAGE)
                                 )
                         else()
                             add_test("${_TEST}"
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
+                                LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
+                                CPP_VERSION ${${_NAME}_CPP_VERSION}
+                                CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
+                                )
+                        endif()
+                    endforeach()
+
+                    register_tests()
+                endif()
+            endif()
+        endif()
+    endif()
+endmacro()
+
+macro(add_exe NAME)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS
+        VERSION                 # version of the target
+        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
+        GENERATE_TARGET_HEADER  # path to target header file
+        CPP_VERSION             # defaults to 20 if omitted
+        )
+    set(_MULTI_VAL_ARGS
+        CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
+        TESTS                   # tests or directories of tests
+        SOURCES                 # extra sources, optional
+        INCLUDE_DIRS            # extra include directories, optional
+        LIBRARIES               # libraries to link
+        EXT                     # external dependencies
+        )
+
+    cmake_parse_arguments(ADD_EXE "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (NOT DEFINED ADD_EXE_VERSION)
+        set(ADD_EXE_VERSION 0.0.0)
+    endif()
+
+    split_version_string(${ADD_EXE_VERSION} _MAJOR _MINOR _PATCH)
+    get_version_name(_NAME "${NAME}" "${_MAJOR}.${_MINOR}.${_PATCH}")
+
+    if (TARGET "${_NAME}")
+        message(STATUS "better-cmake: found existing target ${NAME} version ${ADD_EXE_VERSION}, skipping duplicate.")
+    else()
+        # different version, add it
+
+        add_executable("${_NAME}")
+
+        _add_target("${NAME}" ${ARGN})
+
+        if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+            export_target_variables("${_NAME}")
+        else()
+            unversion_target_variables("${NAME}" "${_NAME}")
+
+            install_executable(TARGET "${_NAME}" NAME "${NAME}")
+
+            if (DEFINED ADD_EXE_TESTS)
+                find_package(t1 QUIET)
+
+                if (t1_FOUND)
+                    foreach (_TEST ${ADD_EXE_TESTS})
+                        if (IS_DIRECTORY "${_TEST}")
+                            add_test_directory("${_TEST}"
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
-                                LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES})
+                                LIBRARIES ${${_NAME}_LIBRARIES}
+                                )
+                        else()
+                            add_test("${_TEST}"
+                                CPP_VERSION ${${_NAME}_CPP_VERSION}
+                                CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
+                                LIBRARIES ${${_NAME}_LIBRARIES}
+                                )
                         endif()
                     endforeach()
 
