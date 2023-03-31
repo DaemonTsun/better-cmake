@@ -1,8 +1,8 @@
 
-# version 1.5
+# version 1.6
 
 set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 5)
+set(BETTER_CMAKE_VERSION_MINOR 6)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -339,7 +339,7 @@ endmacro()
 #   add_lib(myLib ...)
 #   add_external_dependency(${myLib_TARGET} shl 0.6.0 ext/shl)
 macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
-    set(_OPTIONS INCLUDE LINK)
+    set(_OPTIONS INCLUDE LINK GIT_SUBMODULE)
     set(_SINGLE_VAL_ARGS)
     set(_MULTI_VAL_ARGS)
 
@@ -352,7 +352,30 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
     split_version_string("${EXTVERSION}" _EXTMAJOR _EXTMINOR _EXTPATCH)
     get_version_name(_EXTNAME "${EXTNAME}" "${_EXTMAJOR}" "${_EXTMINOR}" "${_EXTPATCH}")
 
-    include_subdirectory("${EXTPATH}")
+    if (NOT TARGET "${_EXTNAME}")
+        # target is not already included
+
+        if (NOT EXISTS "${EXTPATH}/CMakeLists.txt")
+            # target directory is probably empty.
+            # see if its a git submodule and initialize it, then include it,
+            # fail otherwise.
+            
+            if (_ADD_LIB_EXT_GIT_SUBMODULE)
+                find_program(git_INSTALLED git)
+
+                if (NOT git_INSTALLED)
+                    message(FATAL_ERROR "add_external_dependency: external dependency ${EXTNAME} is an uninitialized git submodule and requires git to be installed. Alternatively initialize the dependency manually.")
+                endif()
+
+                execute_process(COMMAND "${git_INSTALLED}" submodule update --init "${EXTPATH}"
+                                WORKING_DIRECTORY "${ROOT}") 
+            else()
+                message(FATAL_ERROR "add_external_dependency: path ${EXTPATH} of external dependency ${EXTNAME} does not contain a CMakeLists.txt file.")
+            endif()
+        endif()
+
+        include_subdirectory("${EXTPATH}")
+    endif()
 
     if (NOT TARGET "${_EXTNAME}")
         message(FATAL_ERROR "add_external_dependency: external dependency ${EXTNAME} version ${EXTVERSION} not found after including path ${EXTPATH}.")
