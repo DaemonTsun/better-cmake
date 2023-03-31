@@ -1,8 +1,8 @@
 
-# version 1.4
+# version 1.5
 
 set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 4)
+set(BETTER_CMAKE_VERSION_MINOR 5)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -263,8 +263,24 @@ macro(target_cpp_version OUT_VAR TARGET VERSION)
     set("${OUT_VAR}" "${VERSION}")
 endmacro()
 
-macro(get_version_name OUT_VAR NAME VERSION)
-    set(${OUT_VAR} "${NAME}-${VERSION}")
+macro(get_version_name OUT_VAR NAME MAJOR MINOR PATCH)
+    set(_TMP "")
+
+    if ("${PATCH}" EQUAL 0)
+        if ("${MINOR}" EQUAL 0)
+            if (NOT "${MAJOR}" EQUAL 0)
+                set(_TMP "-${MAJOR}")
+            endif()
+        else()
+            set(_TMP "-${MAJOR}.${MINOR}")
+        endif()
+    else()
+        set(_TMP "-${MAJOR}.${MINOR}.${PATCH}")
+    endif()
+
+    set(_TMP "${NAME}${_TMP}")
+    set(${OUT_VAR} "${_TMP}")
+    unset(_TMP)
 endmacro()
 
 # this effectively makes ARGN a list within a string
@@ -334,7 +350,7 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
     endif()
 
     split_version_string("${EXTVERSION}" _EXTMAJOR _EXTMINOR _EXTPATCH)
-    get_version_name(_EXTNAME "${EXTNAME}" "${_EXTMAJOR}.${_EXTMINOR}.${_EXTPATCH}")
+    get_version_name(_EXTNAME "${EXTNAME}" "${_EXTMAJOR}" "${_EXTMINOR}" "${_EXTPATCH}")
 
     include_subdirectory("${EXTPATH}")
 
@@ -388,7 +404,7 @@ macro(_add_target NAME)
     endif()
 
     split_version_string(${_ADD_TARGET_VERSION} _MAJOR _MINOR _PATCH)
-    get_version_name(_NAME "${NAME}" "${_MAJOR}.${_MINOR}.${_PATCH}")
+    get_version_name(_NAME "${NAME}" "${_MAJOR}" "${_MINOR}" "${_PATCH}")
 
     # set versions
     set("${_NAME}_VERSION" "${_MAJOR}.${_MINOR}.${_PATCH}")
@@ -474,7 +490,7 @@ macro(add_lib NAME LINKAGE)
     endif()
 
     split_version_string(${ADD_LIB_VERSION} _MAJOR _MINOR _PATCH)
-    get_version_name(_NAME "${NAME}" "${_MAJOR}.${_MINOR}.${_PATCH}")
+    get_version_name(_NAME "${NAME}" "${_MAJOR}" "${_MINOR}" "${_PATCH}")
 
     if (TARGET "${_NAME}")
         message(STATUS "better-cmake: found existing target ${NAME} version ${ADD_LIB_VERSION}, skipping duplicate.")
@@ -549,7 +565,7 @@ macro(add_exe NAME)
     endif()
 
     split_version_string(${ADD_EXE_VERSION} _MAJOR _MINOR _PATCH)
-    get_version_name(_NAME "${NAME}" "${_MAJOR}.${_MINOR}.${_PATCH}")
+    get_version_name(_NAME "${NAME}" "${_MAJOR}" "${_MINOR}" "${_PATCH}")
 
     if (TARGET "${_NAME}")
         message(STATUS "better-cmake: found existing target ${NAME} version ${ADD_EXE_VERSION}, skipping duplicate.")
