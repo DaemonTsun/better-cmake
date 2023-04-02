@@ -230,12 +230,13 @@ endmacro()
 
 # get_cpp_warnings: get a list of cpp warnings from ARGN
 macro(get_cpp_warnings OUT_VAR)
-    set(_OPTIONS ALL EXTRA PEDANTIC SANE)
+    set(_OPTIONS ALL EXTRA PEDANTIC SANE FATAL)
     set(_SINGLE_VAL_ARGS)
     set(_MULTI_VAL_ARGS)
 
     cmake_parse_arguments(TARGET_CPP_WARNINGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
     
+    # TODO: compiler-specific alternatives here, e.g. MSVC
     if (TARGET_CPP_WARNINGS_ALL)
         list(APPEND ${OUT_VAR} -Wall)
     endif()
@@ -250,6 +251,10 @@ macro(get_cpp_warnings OUT_VAR)
 
     if (TARGET_CPP_WARNINGS_SANE)
         list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable)
+    endif()
+
+    if (TARGET_CPP_WARNINGS_FATAL)
+        list(APPEND ${OUT_VAR} -Wfatal-errors)
     endif()
 
     if (DEFINED TARGET_CPP_WARNINGS_UNPARSED_ARGUMENTS)
