@@ -68,11 +68,12 @@ macro(exit_if_included)
 endmacro()
 
 # install_library: set install targets for the given target library.
-# usage: install_library(TARGET <target> HEADERS <headers>)
+# usage: install_library(TARGET <target> HEADERS <headers> SOURCES_DIR <dir>)
+# prefer to use SOURCES_DIR, not HEADERS
 macro(install_library)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS TARGET)
-    set(_MULTI_VAL_ARGS HEADERS)
+    set(_MULTI_VAL_ARGS HEADERS SOURCES_DIR)
 
     cmake_parse_arguments(INSTALL_LIBRARY "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
 
@@ -81,7 +82,15 @@ macro(install_library)
     endif()
 
     if (DEFINED INSTALL_LIBRARY_HEADERS)
-        install(FILES ${INSTALL_LIBRARY_HEADERS} DESTINATION "include/${INSTALL_LIBRARY_TARGET}/${PROJECT_NAME}")
+        install(FILES ${INSTALL_LIBRARY_HEADERS}
+                DESTINATION "include/${INSTALL_LIBRARY_TARGET}/${PROJECT_NAME}")
+    endif()
+
+    if (DEFINED INSTALL_LIBRARY_SOURCES_DIR)
+        install(DIRECTORY "${INSTALL_LIBRARY_SOURCES_DIR}/"
+                DESTINATION "include/${INSTALL_LIBRARY_TARGET}"
+                FILES_MATCHING REGEX ".*\\.(h|hpp)"
+        )
     endif()
 
     install(TARGETS "${INSTALL_LIBRARY_TARGET}"
@@ -550,7 +559,7 @@ macro(add_lib NAME LINKAGE)
         else()
             unversion_target_variables("${NAME}" "${_NAME}")
 
-            install_library(TARGET "${_NAME}" HEADERS ${${_NAME}_HEADERS})
+            install_library(TARGET "${_NAME}" SOURCES_DIR "${${_NAME}_SOURCES_DIR}")
 
             if (DEFINED ADD_LIB_TESTS)
                 find_package(t1 QUIET)
