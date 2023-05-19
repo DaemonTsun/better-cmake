@@ -80,46 +80,62 @@ macro(get_deepest_common_parent_path OUT_VAR)
     set(${OUT_VAR} "${_PARENT}")
 endmacro()
 
-# copy_files_target: copies the input files FILES to DESTINATION
-# (relative to base BASE, default is deepest common path among all input files and
-# destination) as a target, and writes the targets to TARGET_VAR.
-macro(copy_files_target TARGET_VAR)
+# used internally
+macro(_copy_files_base DO_TARGET TARGET_VAR)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS DESTINATION BASE)
     set(_MULTI_VAL_ARGS FILES)
 
-    cmake_parse_arguments(COPY_FILES_TARGET "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    cmake_parse_arguments(COPY_FILES_BASE "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
 
-    if (NOT DEFINED COPY_FILES_TARGET_FILES)
+    if (NOT DEFINED COPY_FILES_BASE_FILES)
         message(FATAL_ERROR "copy_files_target: missing FILES")
     endif()
 
-    if (NOT DEFINED COPY_FILES_TARGET_DESTINATION)
+    if (NOT DEFINED COPY_FILES_BASE_DESTINATION)
         message(FATAL_ERROR "copy_files_target: missing DESTINATION")
     endif()
 
-    if (NOT DEFINED COPY_FILES_TARGET_BASE)
-        get_deepest_common_parent_path(COPY_FILES_TARGET_BASE ${COPY_FILES_TARGET_FILES} "${COPY_FILES_TARGET_DESTINATION}")
+    if (NOT DEFINED COPY_FILES_BASE_BASE)
+        get_deepest_common_parent_path(COPY_FILES_BASE_BASE ${COPY_FILES_BASE_FILES} "${COPY_FILES_BASE_DESTINATION}")
     endif()
 
     file(MAKE_DIRECTORY "${DEST_DIR}")
 
-    foreach(_FILE ${COPY_FILES_TARGET_FILES})
-        cmake_path(RELATIVE_PATH _FILE BASE_DIRECTORY "${COPY_FILES_TARGET_BASE}" OUTPUT_VARIABLE _REL_FILE)
-        set(_OUT_FILE "${COPY_FILES_TARGET_DESTINATION}/${_REL_FILE}")
+    foreach(_FILE ${COPY_FILES_BASE_FILES})
+        cmake_path(RELATIVE_PATH _FILE BASE_DIRECTORY "${COPY_FILES_BASE_BASE}" OUTPUT_VARIABLE _REL_FILE)
+        set(_OUT_FILE "${COPY_FILES_BASE_DESTINATION}/${_REL_FILE}")
         cmake_path(GET _OUT_FILE PARENT_PATH _PARENT)
 
         file(MAKE_DIRECTORY "${_PARENT}")
         message(DEBUG "copying file ${_FILE}")
         
-        add_custom_command(
-            OUTPUT "${_OUT_FILE}"
-            COMMAND ${CMAKE_COMMAND} "-E" "copy" "${_FILE}" "${_OUT_FILE}"
-            DEPENDS "${_FILE}"
-        )
+        if (${DO_TARGET})
+            add_custom_command(
+                OUTPUT "${_OUT_FILE}"
+                COMMAND ${CMAKE_COMMAND} "-E" "copy" "${_FILE}" "${_OUT_FILE}"
+                DEPENDS "${_FILE}")
+        else()
+            configure_file("${_FILE}" "${_OUT_FILE}" COPYONLY)
+        endif()
 
         list(APPEND ${TARGET_VAR} "${_OUT_FILE}")
     endforeach()
+endmacro()
+
+# copy_files: copies the input files FILES to DESTINATION
+# (relative to base BASE, default is deepest common path among all input files and
+# destination) at configure time, and overwrites them if source files are
+# newer.
+macro(copy_files)
+    _copy_files_base(FALSE _ ${ARGN})
+endmacro()
+
+# copy_files_target: copies the input files FILES to DESTINATION
+# (relative to base BASE, default is deepest common path among all input files and
+# destination) as a target, and writes the targets to TARGET_VAR.
+macro(copy_files_target TARGET_VAR)
+    _copy_files_base(TRUE ${TARGET_VAR} ${ARGN})
 endmacro()
 
 # etc
