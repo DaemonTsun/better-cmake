@@ -80,6 +80,48 @@ macro(get_deepest_common_parent_path OUT_VAR)
     set(${OUT_VAR} "${_PARENT}")
 endmacro()
 
+# copy_files_target: copies the input files FILES to DESTINATION
+# (relative to base BASE, default is deepest common path among all input files and
+# destination) as a target, and writes the targets to TARGET_VAR.
+macro(copy_files_target TARGET_VAR)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS DESTINATION BASE)
+    set(_MULTI_VAL_ARGS FILES)
+
+    cmake_parse_arguments(COPY_FILES_TARGET "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+
+    if (NOT DEFINED COPY_FILES_TARGET_FILES)
+        message(FATAL_ERROR "copy_files_target: missing FILES")
+    endif()
+
+    if (NOT DEFINED COPY_FILES_TARGET_DESTINATION)
+        message(FATAL_ERROR "copy_files_target: missing DESTINATION")
+    endif()
+
+    if (NOT DEFINED COPY_FILES_TARGET_BASE)
+        get_deepest_common_parent_path(COPY_FILES_TARGET_BASE ${COPY_FILES_TARGET_FILES} "${COPY_FILES_TARGET_DESTINATION}")
+    endif()
+
+    file(MAKE_DIRECTORY "${DEST_DIR}")
+
+    foreach(_FILE ${COPY_FILES_TARGET_FILES})
+        cmake_path(RELATIVE_PATH _FILE BASE_DIRECTORY "${COPY_FILES_TARGET_BASE}" OUTPUT_VARIABLE _REL_FILE)
+        set(_OUT_FILE "${COPY_FILES_TARGET_DESTINATION}/${_REL_FILE}")
+        cmake_path(GET _OUT_FILE PARENT_PATH _PARENT)
+
+        file(MAKE_DIRECTORY "${_PARENT}")
+        message(DEBUG "copying file ${_FILE}")
+        
+        add_custom_command(
+            OUTPUT "${_OUT_FILE}"
+            COMMAND ${CMAKE_COMMAND} "-E" "copy" "${_FILE}" "${_OUT_FILE}"
+            DEPENDS "${_FILE}"
+        )
+
+        list(APPEND ${TARGET_VAR} "${_OUT_FILE}")
+    endforeach()
+endmacro()
+
 # etc
 macro(project_author NAME)
     set(_OPTIONS)
