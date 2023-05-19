@@ -133,7 +133,10 @@ macro(export_target_variables NAME)
     set_export(${NAME}_SOURCES_DIR)
     set_export(${NAME}_LIBRARIES)
     set_export(${NAME}_SOURCES)
+    set_export(${NAME}_INCLUDE_DIRS)
+    set(${NAME}_INCLUDE_DIRECTORIES ${${NAME}_INCLUDE_DIRS})
     set_export(${NAME}_INCLUDE_DIRECTORIES)
+    set_export(${NAME}_LINK_DIRS)
     set_export(${NAME}_HEADERS)
     set_export(${NAME}_ROOT)
 endmacro()
@@ -151,7 +154,9 @@ macro(unversion_target_variables NAME VNAME)
     _unversion_variable(${NAME} ${VNAME} _SOURCES_DIR)
     _unversion_variable(${NAME} ${VNAME} _LIBRARIES)
     _unversion_variable(${NAME} ${VNAME} _SOURCES)
-    _unversion_variable(${NAME} ${VNAME} _INCLUDE_DIRECTORIES)
+    _unversion_variable(${NAME} ${VNAME} _INCLUDE_DIRS)
+    set(${NAME}_INCLUDE_DIRECTORIES ${${VNAME}_INCLUDE_DIRS})
+    _unversion_variable(${NAME} ${VNAME} _LINK_DIRS)
     _unversion_variable(${NAME} ${VNAME} _HEADERS)
     _unversion_variable(${NAME} ${VNAME} _ROOT)
 endmacro()
@@ -410,7 +415,7 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
         endif()
 
         target_include_directories("${TARGET}" PRIVATE "${${_EXTNAME}_SOURCES_DIR}")
-        list(APPEND "${TARGET}_INCLUDE_DIRECTORIES" "${${_EXTNAME}_SOURCES_DIR}")
+        list(APPEND "${TARGET}_INCLUDE_DIRS" "${${_EXTNAME}_SOURCES_DIR}")
     endif()
 
     if (_ADD_LIB_EXT_LINK)
@@ -432,12 +437,13 @@ macro(_add_target NAME)
         VERSION                 # version of the target
         SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
-        CPP_VERSION             # defaults to 20 if omitted
+        CPP_VERSION             # defaults to 17 if omitted
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # external dependencies
         TESTS
@@ -497,7 +503,11 @@ macro(_add_target NAME)
     endif()
 
     if (DEFINED _ADD_TARGET_INCLUDE_DIRS)
-        list(APPEND "${_NAME}_INCLUDE_DIRECTORIES" ${_ADD_TARGET_INCLUDE_DIRS})
+        list(APPEND "${_NAME}_INCLUDE_DIRS" ${_ADD_TARGET_INCLUDE_DIRS})
+    endif()
+
+    if (DEFINED _ADD_TARGET_LINK_DIRS)
+        list(APPEND "${_NAME}_LINK_DIRS" ${_ADD_TARGET_LINK_DIRS})
     endif()
 
     if (DEFINED _ADD_TARGET_LIBRARIES)
@@ -508,7 +518,11 @@ macro(_add_target NAME)
         _add_target_ext("${_NAME}" ${_ADD_TARGET_EXT})
     endif()
 
-    target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES})
+    target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS})
+
+    if (DEFINED ${_NAME}_LINK_DIRS)
+        target_link_directories(${_NAME} PRIVATE ${${_NAME}_LINK_DIRS})
+    endif()
 
     if (DEFINED "${_NAME}_LIBRARIES")
         target_link_libraries("${_NAME}" PRIVATE ${${_NAME}_LIBRARIES})
@@ -528,6 +542,7 @@ macro(add_lib NAME LINKAGE)
         TESTS                   # tests or directories of tests
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # external dependencies
         )
@@ -568,14 +583,14 @@ macro(add_lib NAME LINKAGE)
                     foreach (_TEST ${ADD_LIB_TESTS})
                         if (IS_DIRECTORY "${_TEST}")
                             add_test_directory("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 )
                         else()
                             add_test("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
@@ -603,6 +618,7 @@ macro(add_exe NAME)
         TESTS                   # tests or directories of tests
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # external dependencies
         )
@@ -639,17 +655,17 @@ macro(add_exe NAME)
                     foreach (_TEST ${ADD_EXE_TESTS})
                         if (IS_DIRECTORY "${_TEST}")
                             add_test_directory("${_TEST}"
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                LIBRARIES ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
-                                LIBRARIES ${${_NAME}_LIBRARIES}
                                 )
                         else()
                             add_test("${_TEST}"
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                LIBRARIES ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRECTORIES}
-                                LIBRARIES ${${_NAME}_LIBRARIES}
                                 )
                         endif()
                     endforeach()
