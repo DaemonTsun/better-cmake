@@ -36,6 +36,50 @@ macro(set_export VAR)
     endif()
 endmacro()
 
+# gets the deepest common path among all arguments, e.g.
+# get_deepest_common_parent_path(DIR "/home/user/testfile.txt"
+#                                    "/home/user/directory"
+#                                    "/home/user/dev/git/better-cmake")
+# message("${DIR}")
+#
+# results in:
+# /home/user
+#
+macro(get_deepest_common_parent_path OUT_VAR)
+    set(_PARENT "${ARGV1}")
+    
+    foreach (_PATH ${ARGN})
+        set(_START "")
+
+        if (IS_DIRECTORY "${_PATH}")
+            set(_START "${_PATH}")
+        else()
+            cmake_path(GET _PATH PARENT_PATH _START)
+        endif()
+
+        set(_END FALSE)
+        while (NOT _END)
+            cmake_path(IS_PREFIX _PARENT "${_START}" _IS_PARENT)
+
+            if (NOT _IS_PARENT)
+                cmake_path(GET _PARENT PARENT_PATH _TMP)
+
+                # we test this to see if we're at the root.
+                # this would fail on different roots otherwise
+                if (_TMP STREQUAL _PARENT)
+                    set(_END TRUE)
+                else()
+                    set(_PARENT "${_TMP}")
+                endif()
+            else()
+                set(_END TRUE)
+            endif()
+        endwhile()
+    endforeach()
+
+    set(${OUT_VAR} "${_PARENT}")
+endmacro()
+
 # etc
 macro(project_author NAME)
     set(_OPTIONS)
