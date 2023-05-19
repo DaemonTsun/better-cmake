@@ -1,8 +1,8 @@
 
-# version 1.6
+# version 1.7
 
 set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 6)
+set(BETTER_CMAKE_VERSION_MINOR 7)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -116,6 +116,7 @@ macro(install_executable)
 endmacro()
 
 macro(export_target_variables NAME)
+    set_export(${NAME}_TARGET)
     set_export(${NAME}_VERSION)
     set_export(${NAME}_VERSION_MAJOR)
     set_export(${NAME}_VERSION_MINOR)
@@ -125,6 +126,7 @@ macro(export_target_variables NAME)
     set_export(${NAME}_SOURCES)
     set_export(${NAME}_INCLUDE_DIRECTORIES)
     set_export(${NAME}_HEADERS)
+    set_export(${NAME}_ROOT)
 endmacro()
 
 macro(_unversion_variable NAME VNAME VAR)
@@ -142,6 +144,7 @@ macro(unversion_target_variables NAME VNAME)
     _unversion_variable(${NAME} ${VNAME} _SOURCES)
     _unversion_variable(${NAME} ${VNAME} _INCLUDE_DIRECTORIES)
     _unversion_variable(${NAME} ${VNAME} _HEADERS)
+    _unversion_variable(${NAME} ${VNAME} _ROOT)
 endmacro()
 
 # split_version_string: splits the given VERSION string into
@@ -437,6 +440,7 @@ macro(_add_target NAME)
         set(_ADD_TARGET_VERSION 0.0.0)
     endif()
 
+    # variables
     split_version_string(${_ADD_TARGET_VERSION} _MAJOR _MINOR _PATCH)
     get_version_name(_NAME "${NAME}" "${_MAJOR}" "${_MINOR}" "${_PATCH}")
 
@@ -445,6 +449,8 @@ macro(_add_target NAME)
     set("${_NAME}_VERSION_MAJOR" "${_MAJOR}")
     set("${_NAME}_VERSION_MINOR" "${_MINOR}")
     set("${_NAME}_VERSION_PATCH" "${_PATCH}")
+
+    set("${_NAME}_ROOT" "${CMAKE_CURRENT_SOURCE_DIR}")
 
     if (NOT DEFINED _ADD_TARGET_SOURCES_DIR)
         if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/")
@@ -467,7 +473,7 @@ macro(_add_target NAME)
     target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES} ${_ADD_TARGET_SOURCES})
 
     if (NOT DEFINED _ADD_TARGET_CPP_VERSION)
-        set(_ADD_TARGET_CPP_VERSION 20)
+        set(_ADD_TARGET_CPP_VERSION 17)
     endif()
 
     target_cpp_version("${_NAME}_CPP_VERSION" "${_NAME}" ${_ADD_TARGET_CPP_VERSION})
