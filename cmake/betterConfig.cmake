@@ -15,6 +15,19 @@ add_compile_options (-fdiagnostics-color=always)
 # versions
 cmake_policy(SET CMP0048 NEW)
 
+# build type, SOMEHOW if you don't specify CMAKE_BUILD_TYPE, you get
+# neither Debug nor Release. amazing work CMake.
+# this sets build type to Debug if not specified.
+if (DEFINED Build)
+    set(CMAKE_BUILD_TYPE "${Build}" CACHE STRING "" FORCE)
+elseif (NOT CMAKE_BUILD_TYPE)
+    if (NOT DEFINED Build) 
+        set(Build Debug)
+    endif()
+
+    set(CMAKE_BUILD_TYPE "${Build}" CACHE STRING "" FORCE)
+endif()
+
 # basic functionality
 macro(increment VAR)
     MATH(EXPR ${VAR} "${${VAR}}+1")
