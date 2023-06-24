@@ -388,7 +388,7 @@ macro(get_cpp_warnings OUT_VAR)
     endif()
 
     if (TARGET_CPP_WARNINGS_SANE)
-        list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable)
+        list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar)
     endif()
 
     if (TARGET_CPP_WARNINGS_FATAL)
