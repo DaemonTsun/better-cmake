@@ -1,8 +1,8 @@
 
-# version 1.7
+# version 1.8
 
 set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 7)
+set(BETTER_CMAKE_VERSION_MINOR 8)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -14,6 +14,8 @@ add_compile_options (-fdiagnostics-color=always)
 
 # versions
 cmake_policy(SET CMP0048 NEW)
+
+find_program(git_PROGRAM git)
 
 # build type, SOMEHOW if you don't specify CMAKE_BUILD_TYPE, you get
 # neither Debug nor Release. amazing work CMake.
@@ -47,6 +49,43 @@ macro(set_export VAR)
     if (DEFINED ${VAR})
         set(${VAR} ${${VAR}} PARENT_SCOPE)
     endif()
+endmacro()
+
+macro(get_git_submodule_checkout_commit OUT_VAR PATH)
+    execute_process(COMMAND "${git_PROGRAM}" submodule status --cached "${PATH}"
+                    OUTPUT_VARIABLE _git_result
+                    WORKING_DIRECTORY "${ROOT}") 
+
+    string(REGEX MATCH ".([a-z0-9]+)" _ "${_git_result}")
+    set(${OUT_VAR} "${CMAKE_MATCH_1}")
+endmacro()
+
+macro(get_git_submodule_status OUT_VAR PATH)
+    execute_process(COMMAND "${git_PROGRAM}" submodule status --cached "${PATH}"
+                    OUTPUT_VARIABLE _git_result
+                    WORKING_DIRECTORY "${ROOT}") 
+
+    string(REGEX MATCH "(.)" _ "${_git_result}")
+    set(${OUT_VAR} "${CMAKE_MATCH_1}")
+endmacro()
+
+macro(git_submodule_update PATH)
+    set(_OPTIONS INIT)
+    set(_SINGLE_VAL_ARGS WORKING_DIRECTORY)
+    set(_MULTI_VAL_ARGS)
+
+    cmake_parse_arguments(GSU "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+
+    if (GSU_INIT)
+        set(GSU_INIT "--init")
+    endif()
+
+    if (NOT GSU_WORKING_DIRECTORY)
+        set(GSU_WORKING_DIRECTORY "${ROOT}")
+    endif()
+
+    execute_process(COMMAND "${git_PROGRAM}" submodule update "${GSU_INIT}" "${PATH}"
+        WORKING_DIRECTORY "${GSU_WORKING_DIRECTORY}") 
 endmacro()
 
 # gets the deepest common path among all arguments, e.g.
@@ -504,14 +543,11 @@ macro(add_external_dependency TARGET EXTNAME EXTVERSION EXTPATH)
             # fail otherwise.
             
             if (_ADD_LIB_EXT_GIT_SUBMODULE)
-                find_program(git_INSTALLED git)
-
-                if (NOT git_INSTALLED)
+                if (NOT git_PROGRAM)
                     message(FATAL_ERROR "add_external_dependency: external dependency ${EXTNAME} is an uninitialized git submodule and requires git to be installed. Alternatively initialize the dependency manually.")
                 endif()
 
-                execute_process(COMMAND "${git_INSTALLED}" submodule update --init "${EXTPATH}"
-                                WORKING_DIRECTORY "${ROOT}") 
+                git_submodule_update("${EXTPATH}" INIT)
             else()
                 message(FATAL_ERROR "add_external_dependency: path ${EXTPATH} of external dependency ${EXTNAME} does not contain a CMakeLists.txt file.")
             endif()
@@ -546,6 +582,63 @@ macro(_add_target_ext TARGET)
     endforeach()
 endmacro()
 
+# add_git_submodule: add a git submodule dependency.
+# the dependency doesn't have to be better-cmake, but adding the same submodule
+# multiple times with different commits will probably cause CMake to fail, as
+# CMake can't deal with targets having the same name. Pathetic.
+# example:
+#   add_git_submodule(${myLib_TARGET} glm "${ROOT}/ext/glm" INCLUDE "${ROOT}/ext/glm")
+macro(add_git_submodule TARGET MODNAME MODPATH)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS CMAKELISTS_DIR)
+    set(_MULTI_VAL_ARGS INCLUDE)
+
+    cmake_parse_arguments(_ADD_GIT_SUBMODULE "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+
+    if (NOT IS_DIRECTORY "${MODPATH}")
+        message(FATAL_ERROR "add_git_submodule: git submodule path ${MODPATH} does not exist.")
+    endif()
+
+    get_git_submodule_checkout_commit(_COMMIT "${MODPATH}")
+    # git status of "-" means the submodule is uninitialized
+    get_git_submodule_status(_GIT_STATUS "${MODPATH}")
+
+    if (${MODNAME}_COMMIT)
+        if (NOT ${MODNAME}_COMMIT STREQUAL _COMMIT)
+            message(WARNING "add_git_submodule: conflicting submodule ${MODNAME} commits ${_COMMIT} (from this repo) and ${${MODNAME}_COMMIT}. Attempting to continue.")
+            
+            if (_GIT_STATUS STREQUAL "-")
+                git_submodule_update("${MODPATH}" INIT)
+            endif()
+        endif()
+    else()
+        if (_GIT_STATUS STREQUAL "-")
+            git_submodule_update("${MODPATH}" INIT)
+            set(${MODNAME}_COMMIT "${_COMMIT}")
+            set_export(${MODNAME}_COMMIT)
+        else()
+            message("add_git_submodule: submodule ${MODNAME} already loaded")
+        endif()
+    endif()
+
+    if (_ADD_GIT_SUBMODULE_INCLUDE)
+        target_include_directories("${TARGET}" PRIVATE ${_ADD_GIT_SUBMODULE_INCLUDE})
+        list(APPEND "${TARGET}_INCLUDE_DIRS" ${_ADD_GIT_SUBMODULE_INCLUDE})
+    endif()
+
+    if (_ADD_GIT_SUBMODULE_CMAKELISTS_DIR)
+        include_subdirectory("${_ADD_GIT_SUBMODULE_CMAKELISTS_DIR}")
+    endif()
+endmacro()
+
+macro(_add_target_submodules TARGET)
+    parse_arguments_by_delimiter(_GROUPS MODULE ${ARGN})
+
+    foreach (ARGS ${_GROUPS})
+        add_git_submodule(${TARGET} ${ARGS})
+    endforeach()
+endmacro()
+
 macro(_add_target NAME)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS
@@ -560,8 +653,9 @@ macro(_add_target NAME)
         INCLUDE_DIRS            # extra include directories, optional
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
-        EXT                     # external dependencies
-        TESTS
+        EXT                     # better-cmake external dependencies
+        SUBMODULES              # git external dependencies
+        TESTS                   # t1 tests
         )
 
     cmake_parse_arguments(_ADD_TARGET "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
@@ -633,6 +727,10 @@ macro(_add_target NAME)
         _add_target_ext("${_NAME}" ${_ADD_TARGET_EXT})
     endif()
 
+    if (DEFINED _ADD_TARGET_SUBMODULES)
+        _add_target_submodules("${_NAME}" ${_ADD_TARGET_SUBMODULES})
+    endif()
+
     target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS})
 
     if (DEFINED ${_NAME}_LINK_DIRS)
@@ -650,16 +748,17 @@ macro(add_lib NAME LINKAGE)
         VERSION                 # version of the target
         SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
-        CPP_VERSION             # defaults to 20 if omitted
+        CPP_VERSION             # defaults to 17 if omitted
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
-        TESTS                   # tests or directories of tests
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
-        EXT                     # external dependencies
+        EXT                     # better-cmake external dependencies
+        SUBMODULES              # git external dependencies
+        TESTS                   # t1 tests or directories of tests
         )
 
     cmake_parse_arguments(ADD_LIB "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
@@ -726,16 +825,17 @@ macro(add_exe NAME)
         VERSION                 # version of the target
         SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
-        CPP_VERSION             # defaults to 20 if omitted
+        CPP_VERSION             # defaults to 17 if omitted
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
-        TESTS                   # tests or directories of tests
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
-        EXT                     # external dependencies
+        EXT                     # better-cmake external dependencies
+        SUBMODULES              # git external dependencies
+        TESTS                   # tests or directories of tests
         )
 
     cmake_parse_arguments(ADD_EXE "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
