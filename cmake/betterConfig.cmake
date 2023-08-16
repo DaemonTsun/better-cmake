@@ -1,8 +1,9 @@
 
-# version 1.8
+# version 2
+# new in version 2: some Windows support
 
-set(BETTER_CMAKE_VERSION_MAJOR 1)
-set(BETTER_CMAKE_VERSION_MINOR 8)
+set(BETTER_CMAKE_VERSION_MAJOR 2)
+set(BETTER_CMAKE_VERSION_MINOR 0)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -10,7 +11,11 @@ set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
 message(VERBOSE "better-cmake v${BETTER_CMAKE_VERSION} from ${ROOT}")
 
 # by default color output is only generated for Make for some reason
-add_compile_options (-fdiagnostics-color=always)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+   add_compile_options(-fdiagnostics-color=always)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+   add_compile_options(-fcolor-diagnostics)
+endif()
 
 # versions
 cmake_policy(SET CMP0048 NEW)
@@ -415,23 +420,33 @@ macro(get_cpp_warnings OUT_VAR)
     
     # TODO: compiler-specific alternatives here, e.g. MSVC
     if (TARGET_CPP_WARNINGS_ALL)
-        list(APPEND ${OUT_VAR} -Wall)
+	if (CMAKE_CPP_COMPILER_ID STREQUAL "GNU")
+	    list(APPEND ${OUT_VAR} -Wall)
+	endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_EXTRA)
-        list(APPEND ${OUT_VAR} -Wextra)
+	if (CMAKE_CPP_COMPILER_ID STREQUAL "GNU")
+	    list(APPEND ${OUT_VAR} -Wextra)
+	endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_PEDANTIC)
-        list(APPEND ${OUT_VAR} -Wpedantic)
+	if (CMAKE_CPP_COMPILER_ID STREQUAL "GNU")
+            list(APPEND ${OUT_VAR} -Wpedantic)
+	endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_SANE)
-        list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar)
+	if (CMAKE_CPP_COMPILER_ID STREQUAL "GNU")
+            list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar)
+	endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_FATAL)
-        list(APPEND ${OUT_VAR} -Wfatal-errors)
+	if (CMAKE_CPP_COMPILER_ID STREQUAL "GNU")
+            list(APPEND ${OUT_VAR} -Wfatal-errors)
+	endif()
     endif()
 
     if (DEFINED TARGET_CPP_WARNINGS_UNPARSED_ARGUMENTS)
