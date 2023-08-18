@@ -277,12 +277,21 @@ macro(install_executable)
     endif()
 
     if (DEFINED INSTALL_EXECUTABLE_NAME)
-        add_custom_command(TARGET "${INSTALL_EXECUTABLE_TARGET}" POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_TARGET}"
-            "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}")
+        if (WIN32)
+            add_custom_command(TARGET "${INSTALL_EXECUTABLE_TARGET}" POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E copy
+                "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_TARGET}.exe"
+                "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}.exe")
 
-        install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}" DESTINATION bin)
+            install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}.exe" DESTINATION bin)
+        else()
+            add_custom_command(TARGET "${INSTALL_EXECUTABLE_TARGET}" POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E copy
+                "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_TARGET}"
+                "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}")
+
+            install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_NAME}" DESTINATION bin)
+        endif()
     endif()
 
     install(TARGETS "${INSTALL_EXECUTABLE_TARGET}" DESTINATION bin)
