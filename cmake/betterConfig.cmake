@@ -3,7 +3,7 @@
 # new in version 2: some Windows support
 
 set(BETTER_CMAKE_VERSION_MAJOR 2)
-set(BETTER_CMAKE_VERSION_MINOR 0)
+set(BETTER_CMAKE_VERSION_MINOR 1)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -18,6 +18,28 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 if (WIN32)
+    set(Windows 1)
+    set(Linux 0)
+    set(Mac 0)
+    set(Platform "Windows")
+elseif (APPLE)
+    set(Windows 0)
+    set(Linux 0)
+    set(Mac 1)
+    set(Platform "Mac")
+elseif (UNIX)
+    set(Windows 0)
+    set(Linux 1)
+    set(Mac 0)
+    set(Platform "Linux")
+else()
+    # huh??
+    set(Windows 0)
+    set(Linux 0)
+    set(Mac 0)
+endif()
+
+if (Windows)
     # we're dangerous
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS=1)
 endif()
@@ -277,7 +299,7 @@ macro(install_executable)
     endif()
 
     if (DEFINED INSTALL_EXECUTABLE_NAME)
-        if (WIN32)
+        if (Windows)
             add_custom_command(TARGET "${INSTALL_EXECUTABLE_TARGET}" POST_BUILD
                 COMMAND "${CMAKE_COMMAND}" -E copy
                 "${CMAKE_CURRENT_BINARY_DIR}/${INSTALL_EXECUTABLE_TARGET}.exe"
@@ -679,6 +701,31 @@ macro(_add_target_submodules TARGET)
     endforeach()
 endmacro()
 
+# add_target_libraries: add libraries to link for a given target.
+# supports platform-specific library selection with @,
+# example:
+#   add_target_libraries(${myLib_TARGET}
+#                        vulkan
+#                        @Linux pthread zlib
+#                        @Windows zlib)
+#
+# links vulkan on all platforms, pthread and zlib on Linux and zlib on Windows.
+macro(add_target_libraries TARGET)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @Linux @Windows @Mac)
+
+    cmake_parse_arguments(_ADD_TARGET_LIBRARIES "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (DEFINED _ADD_TARGET_LIBRARIES_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_LIBRARIES" ${_ADD_TARGET_LIBRARIES_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_LIBRARIES_\@${Platform}")
+        list(APPEND "${TARGET}_LIBRARIES" ${_ADD_TARGET_LIBRARIES_\@${Platform}})
+    endif()
+endmacro()
+
 macro(_add_target NAME)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS
@@ -760,7 +807,7 @@ macro(_add_target NAME)
     endif()
 
     if (DEFINED _ADD_TARGET_LIBRARIES)
-        list(APPEND "${_NAME}_LIBRARIES" ${_ADD_TARGET_LIBRARIES})
+        add_target_libraries("${_NAME}" ${_ADD_TARGET_LIBRARIES})
     endif()
 
     if (DEFINED _ADD_TARGET_EXT)
