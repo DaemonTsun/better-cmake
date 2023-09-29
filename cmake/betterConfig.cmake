@@ -1,53 +1,19 @@
 
-# version 2
+# version 2.2
+# new in version 2.2: better MSVC support
 # new in version 2: some Windows support
 
 set(BETTER_CMAKE_VERSION_MAJOR 2)
-set(BETTER_CMAKE_VERSION_MINOR 1)
+set(BETTER_CMAKE_VERSION_MINOR 2)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
 
 message(VERBOSE "better-cmake v${BETTER_CMAKE_VERSION} from ${ROOT}")
 
-# by default color output is only generated for Make for some reason
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-   add_compile_options(-fdiagnostics-color=always)
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-   add_compile_options(-fcolor-diagnostics)
-endif()
+# defaults
+set(better_DEFAULT_CXX_STANDARD 17)
 
-if (WIN32)
-    set(Windows 1)
-    set(Linux 0)
-    set(Mac 0)
-    set(Platform "Windows")
-elseif (APPLE)
-    set(Windows 0)
-    set(Linux 0)
-    set(Mac 1)
-    set(Platform "Mac")
-elseif (UNIX)
-    set(Windows 0)
-    set(Linux 1)
-    set(Mac 0)
-    set(Platform "Linux")
-else()
-    # huh??
-    set(Windows 0)
-    set(Linux 0)
-    set(Mac 0)
-endif()
-
-if (Windows)
-    # we're dangerous
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS=1)
-endif()
-
-# versions
-cmake_policy(SET CMP0048 NEW)
-
-find_program(git_PROGRAM git)
 
 # build type, SOMEHOW if you don't specify CMAKE_BUILD_TYPE, you get
 # neither Debug nor Release. amazing work CMake.
@@ -82,6 +48,38 @@ macro(set_export VAR)
         set(${VAR} ${${VAR}} PARENT_SCOPE)
     endif()
 endmacro()
+
+
+
+# platform vars
+if (WIN32)
+    set(Windows 1)
+    set(Linux 0)
+    set(Mac 0)
+    set(Platform "Windows")
+elseif (APPLE)
+    set(Windows 0)
+    set(Linux 0)
+    set(Mac 1)
+    set(Platform "Mac")
+elseif (UNIX)
+    set(Windows 0)
+    set(Linux 1)
+    set(Mac 0)
+    set(Platform "Linux")
+else()
+    # huh??
+    set(Windows 0)
+    set(Linux 0)
+    set(Mac 0)
+endif()
+
+
+
+# versions
+cmake_policy(SET CMP0048 NEW)
+
+find_program(git_PROGRAM git)
 
 macro(get_git_submodule_checkout_commit OUT_VAR PATH)
     execute_process(COMMAND "${git_PROGRAM}" submodule status --cached "${PATH}"
@@ -454,19 +452,20 @@ macro(get_cpp_warnings OUT_VAR)
 
     cmake_parse_arguments(TARGET_CPP_WARNINGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
     
-    # TODO: compiler-specific alternatives here, e.g. MSVC
     if (TARGET_CPP_WARNINGS_ALL)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             list(APPEND ${OUT_VAR} -Wall)
-        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "CLANG")
             list(APPEND ${OUT_VAR} -Wall)
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+            list(APPEND ${OUT_VAR} "/Wall")
         endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_EXTRA)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             list(APPEND ${OUT_VAR} -Wextra)
-        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "CLANG")
             list(APPEND ${OUT_VAR} -Wextra)
         endif()
     endif()
@@ -474,7 +473,7 @@ macro(get_cpp_warnings OUT_VAR)
     if (TARGET_CPP_WARNINGS_PEDANTIC)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             list(APPEND ${OUT_VAR} -Wpedantic)
-        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "CLANG")
             list(APPEND ${OUT_VAR} -Wpedantic)
         endif()
     endif()
@@ -484,12 +483,34 @@ macro(get_cpp_warnings OUT_VAR)
             list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
             list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar -Wno-missing-braces)
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+            # Suppressed warnings:
+            list(APPEND ${OUT_VAR}
+                "/wd4100" # C4100: unused parameter
+                "/wd4003" # C4003: "incorrect" macro parameters
+                "/wd4018" # C4018: signed/unsigned comparison
+                "/wd4130" # C4130: logical operation on string constant
+                "/wd4146" # C4146: unary minus on unsigned type, this is intentional
+                "/wd4365" # C4365: conversion from signed to unsigned
+                "/wd4388" # C4388: signed/unsigned comparison
+                "/wd4389" # C4389: signed/unsigned comparison
+                "/wd4514" # C4514: unreferenced inline function
+                "/wd4577" # C4577: noexcept with exception handling disabled
+                "/wd4668" # C4668: not defined as a preprocessor macro, replacing with '0'
+                "/wd4820" # C4820: added padding at end of struct
+                "/wd5039" # C5039: extern C exceptions
+                "/wd5045" # C5045: spectre
+                "/wd5246" # C5246: initialization of subobjects should be wrapped in braces
+                "/wd5262" # C5262: implicit case fall-through
+            )
         endif()
     endif()
 
     if (TARGET_CPP_WARNINGS_FATAL)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             list(APPEND ${OUT_VAR} -Wfatal-errors)
+        elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+            list(APPEND ${OUT_VAR} "/WX")
         endif()
     endif()
 
@@ -707,7 +728,7 @@ endmacro()
 #   add_target_libraries(${myLib_TARGET}
 #                        vulkan
 #                        @Linux pthread zlib
-#                        @Windows zlib)
+#                        @Windows kernel32 zlib)
 #
 # links vulkan on all platforms, pthread and zlib on Linux and zlib on Windows.
 macro(add_target_libraries TARGET)
@@ -784,7 +805,7 @@ macro(_add_target NAME)
     target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES} ${_ADD_TARGET_SOURCES})
 
     if (NOT DEFINED _ADD_TARGET_CPP_VERSION)
-        set(_ADD_TARGET_CPP_VERSION 17)
+        set(_ADD_TARGET_CPP_VERSION ${better_DEFAULT_CXX_STANDARD})
     endif()
 
     target_cpp_version("${_NAME}_CPP_VERSION" "${_NAME}" ${_ADD_TARGET_CPP_VERSION})
@@ -826,6 +847,14 @@ macro(_add_target NAME)
 
     if (DEFINED "${_NAME}_LIBRARIES")
         target_link_libraries("${_NAME}" PRIVATE ${${_NAME}_LIBRARIES})
+    endif()
+
+    # platform-specific settings
+    # by default color output is only generated for Make for some reason
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options("${_NAME}" PRIVATE -fdiagnostics-color=always)
+    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        target_compile_options("${_NAME}" PRIVATE -fcolor-diagnostics)
     endif()
 endmacro()
 
@@ -913,6 +942,9 @@ macro(add_exe NAME)
         SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
         CPP_VERSION             # defaults to 17 if omitted
+        WINDOWS_SUBSYSTEM       # Windows subsystem, defaults to "console".
+                                # https://learn.microsoft.com/en-us/cpp/build/reference/subsystem-specify-subsystem?view=msvc-170
+                                # Note: because CMake is a huge pile of shit, you can only choose "console" or "windows".
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
@@ -942,6 +974,15 @@ macro(add_exe NAME)
         add_executable("${_NAME}")
 
         _add_target("${NAME}" ${ARGN})
+
+        if (Windows)
+            if (DEFINED ADD_EXE_WINDOWS_SUBSYSTEM)
+                string(TOLOWER "${ADD_EXE_WINDOWS_SUBSYSTEM}" _SUBSYSTEM)
+                if (_SUBSYSTEM STREQUAL "windows")
+                    set_property(TARGET "${_NAME}" PROPERTY WIN32_EXECUTABLE TRUE)
+                endif()
+            endif()
+        endif()
 
         if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             export_target_variables("${_NAME}")
@@ -978,3 +1019,350 @@ macro(add_exe NAME)
         endif()
     endif()
 endmacro()
+
+# =======
+# WINDOWS
+# =======
+
+if (Windows)
+    # time to set "developer prompt" variables manually
+
+    # VSINSTALLDIR is the directory Visual Studio is installed in.
+    # If not set (it probably won't be unless you start a Developer Prompt
+    # or run vcvarsall.bat), we try to find the latest version.
+    if (NOT DEFINED ENV{VSINSTALLDIR})
+        set(_vs_search_path "C:/Program Files/Microsoft Visual Studio")
+        file(GLOB _vs_versions "${_vs_search_path}/*/*")
+
+        if (NOT _vs_versions)
+            message(FATAL_ERROR "Could not set VSINSTALLDIR: no Visual Studio installation found in ${_vs_search_path}.\nSet environment variable VSINSTALLDIR if Visual Studio is installed elsewhere.")
+        endif()
+
+        list(SORT _vs_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vs_versions 0 _vs_current_version)
+        set(ENV{VSINSTALLDIR} "${_vs_current_version}")
+    endif()
+
+    message(VERBOSE "VSINSTALLDIR: $ENV{VSINSTALLDIR}")
+
+    # VSINSTALLDIR: MSVC installation directory.
+    if (NOT DEFINED ENV{VCINSTALLDIR})
+        if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC")
+            message(FATAL_ERROR "Could not set VCINSTALLDIR: Visual Studio is installed but no VC installation found in $ENV{VSINSTALLDIR}/VC. Run Visual Studio and install VC.")
+        endif()
+
+        set(ENV{VCINSTALLDIR} "$ENV{VSINSTALLDIR}/VC")
+    endif()
+
+    message(VERBOSE "VCINSTALLDIR: $ENV{VCINSTALLDIR}")
+
+    # VS170COMNTOOLS: Common7/Tools
+    if (NOT DEFINED ENV{VS170COMNTOOLS})
+        if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/Common7/Tools")
+            message(FATAL_ERROR "Could not set VS170COMNTOOLS: Visual Studio is installed but no Common7/Tools directory was found in installation found at $ENV{VSINSTALLDIR}/Common7/Tools.")
+        endif()
+
+        set(ENV{VS170COMNTOOLS} "$ENV{VSINSTALLDIR}/Common7/Tools")
+    endif()
+
+    message(VERBOSE "VS170COMNTOOLS: $ENV{VS170COMNTOOLS}")
+
+    # VCToolsInstallDir: The versioned directory where MSVC tools like cl.exe (compiler)
+    # and other tools are installed in.
+    if (NOT DEFINED ENV{VCToolsInstallDir})
+        file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Tools/MSVC/*")
+
+        if (NOT _vc_versions)
+            message(FATAL_ERROR "No MSVC tools found in $ENV{VCINSTALLDIR}/Tools/MSVC/. Check your MSVC installation.")
+        endif()
+
+        list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vc_versions 0 _vc_current_version)
+        set(ENV{VCToolsInstallDir} "${_vc_current_version}")
+    endif()
+
+    message(VERBOSE "VCToolsInstallDir $ENV{VCToolsInstallDir}")
+
+    # VCToolsVersion: version of the MSVC tools.
+    if (NOT DEFINED ENV{VCToolsVersion})
+        get_filename_component(_vc_version "$ENV{VCToolsInstallDir}" NAME)
+        set(ENV{VCToolsVersion} "${_vc_version}")
+    endif()
+
+    message(VERBOSE "VCToolsVersion $ENV{VCToolsVersion}")
+
+    # VCToolsRedistDir: The versioned directory where MSVC tools like cl.exe (compiler)
+    # and other tools are installed in.
+    if (NOT DEFINED ENV{VCToolsRedistDir})
+        file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Redist/MSVC/[0-9]*")
+
+        if (NOT _vc_versions)
+            message(FATAL_ERROR "No MSVC redistributables found in $ENV{VCINSTALLDIR}/Redist/MSVC/. Check your MSVC installation.")
+        endif()
+
+        list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vc_versions 0 _vc_current_version)
+        set(ENV{VCToolsRedistDir} "${_vc_current_version}")
+    endif()
+
+    message(VERBOSE "VCToolsRedistDir $ENV{VCToolsRedistDir}")
+
+    #Windows SDK
+    # WindowsSdkDir: the root path of the Windows SDK.
+    if (NOT DEFINED ENV{WindowsSdkDir})
+        set(_winsdk_search_path "C:/Program Files (x86)/Windows Kits")
+        file(GLOB _winsdk_versions "${_winsdk_search_path}/[0-9]*")
+
+        if (NOT _winsdk_versions)
+            message(FATAL_ERROR "Could not set WindowsSdkDir: no Windows Kits installation found in ${_winsdk_search_path}.\nSet environment variable WindowsSdkDir if installation path is elsewhere.")
+        endif()
+
+        list(SORT _winsdk_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _winsdk_versions 0 _winsdk_current_version)
+        set(ENV{WindowsSdkDir} "${_winsdk_current_version}")
+    endif()
+
+    message(VERBOSE "WindowsSdkDir $ENV{WindowsSdkDir}")
+
+    set_default(ENV{WindowsSdkBinPath} "$ENV{WindowsSdkDir}/bin")
+
+    message(VERBOSE "WindowsSdkBinPath $ENV{WindowsSdkBinPath}")
+
+    # WindowsSdkVerBinPath: specific version of the Windows SDK binaries.
+    if (NOT DEFINED ENV{WindowsSdkVerBinPath})
+        file(GLOB _winsdk_verbins "$ENV{WindowsSdkBinPath}/[0-9]*")
+
+        if (NOT _winsdk_verbins)
+            message(FATAL_ERROR "Could not set WindowsSdkBinPath: no Windows SDK versions found in $ENV{WindowsSdkBinPath}.\nCheck your Windows SDK installation.")
+        endif()
+
+        list(SORT _winsdk_verbins COMPARE NATURAL ORDER DESCENDING)
+        list(GET _winsdk_verbins 0 _winsdk_bin_current_version)
+        set(ENV{WindowsSdkVerBinPath} "${_winsdk_bin_current_version}")
+    endif()
+
+    message(VERBOSE "WindowsSdkVerBinPath $ENV{WindowsSdkVerBinPath}")
+
+    # WindowsSDKVersion: the version of the Windows SDK
+    if (NOT DEFINED ENV{WindowsSDKVersion})
+        get_filename_component(_winsdk_version "$ENV{WindowsSdkVerBinPath}" NAME)
+        set_default(ENV{UCRTVersion} "${_winsdk_version}")
+        set(ENV{WindowsSDKVersion} "${_winsdk_version}/")
+    endif()
+
+    message(VERBOSE "WindowsSDKVersion $ENV{WindowsSDKVersion}")
+
+    set_default(ENV{WindowsSDKLibVersion} "$ENV{WindowsSDKVersion}")
+    message(VERBOSE "WindowsSDKLibVersion $ENV{WindowsSDKLibVersion}")
+
+    set_default(ENV{UniversalCRTSdkDir} "$ENV{WindowsSdkDir}")
+
+    
+
+    # include, link, path, ...
+    # (EXTERNAL_)INCLUDE: include paths
+    set(_INCLUDE "")
+    # Standard Library
+    list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/include")
+
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/include")
+        list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/atlmfc/include")
+    endif()
+
+    # VS Auxiliary libs
+    if (IS_DIRECTORY "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
+        list(APPEND _INCLUDE "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
+    endif()
+
+    # Windows kits universal CRT, winrt, um, ...
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}")
+        file(GLOB _includes "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}/*")
+        list(APPEND _INCLUDE ${_includes})
+    endif()
+
+    set(ENV{EXTERNAL_INCLUDE} "${_INCLUDE};$ENV{EXTERNAL_INCLUDE}")
+    message(VERBOSE "EXTERNAL_INCLUDE $ENV{EXTERNAL_INCLUDE}")
+
+    set(ENV{INCLUDE} "${_INCLUDE};$ENV{INCLUDE}")
+
+    include_directories($ENV{INCLUDE})
+    message(VERBOSE "INCLUDE $ENV{INCLUDE}")
+
+
+    # LIB: Library linking paths
+    set(_LIB "")
+    # Standard Library
+    list(APPEND _LIB "$ENV{VCToolsInstallDir}/lib/x64")
+
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+        list(APPEND _LIB "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+    endif()
+
+    # Windows kits universal CRT, um, ...
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
+        list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
+        list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
+    endif()
+
+    set(ENV{LIB} "${_LIB};$ENV{LIB}")
+    message(VERBOSE "LIB $ENV{LIB}")
+    link_directories($ENV{LIB})
+
+
+    # LIBPATH: yes
+    set(_LIBPATH "")
+    # Standard Library
+    list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x64")
+    
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+        list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+    endif()
+
+    # x86 references...?
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/lib/x86/store/references")
+        list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x86/store/references")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
+        list(APPEND _LIBPATH "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
+    endif()
+
+    # PATH: search path
+    set(_PATH "")
+    list(APPEND _PATH "$ENV{VCToolsInstallDir}/bin/HostX64/x64")
+    list(APPEND _PATH "$ENV{WindowsSdkVerBinPath}/x64")
+    list(APPEND _PATH "$ENV{WindowsSdkBinPath}/x64")
+
+    if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
+        list(APPEND _PATH "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
+        list(APPEND _PATH "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
+    endif()
+
+    set(ENV{__VSCMD_PREINIT_PATH} "$ENV{PATH}")
+    set(ENV{PATH} "${_PATH};$ENV{PATH}")
+
+    message(VERBOSE "PATH $ENV{PATH}")
+
+    # etc
+    set_default(ENV{VSCMD_ARG_app_plat} Desktop)
+    set_default(ENV{VSCMD_ARG_HOST_ARCH} x64)
+    set_default(ENV{VSCMD_ARG_TGT_ARCH} x64)
+    set_default(ENV{Platform} x64) # not to be confused with CMake variable Platform
+    set_default(ENV{is_x64_arch} true)
+
+    message(VERBOSE "VSCMD_ARG_app_plat $ENV{VSCMD_ARG_app_plat}")
+    message(VERBOSE "VSCMD_ARG_HOST_ARCH $ENV{VSCMD_ARG_HOST_ARCH}")
+    message(VERBOSE "VSCMD_ARG_TGT_ARCH $ENV{VSCMD_ARG_TGT_ARCH}")
+    message(VERBOSE "Platform $ENV{Platform}")
+    message(VERBOSE "is_x64_arch $ENV{is_x64_arch}")
+
+
+    # I THINK CMAKE_CXX_COMPILER is set before project() on Windows.
+    get_filename_component(_COMPILER "${CMAKE_CXX_COMPILER}" NAME)
+
+    if (_COMPILER MATCHES ".*cl.exe")
+        # Linker flags
+        set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+        # doesn't create an incremental build
+        # https://learn.microsoft.com/en-us/cpp/build/reference/incremental-link-incrementally?view=msvc-170
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " /incremental:no")
+
+        # By default DEBUG flags are /debug /INCREMENTAL, we don't want that.
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "")
+
+        # removes unused definitions
+        # https://learn.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=msvc-170
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " /opt:ref")
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " /machine:x64")
+
+        # let's not generate a manifest file
+        # https://learn.microsoft.com/en-us/cpp/build/reference/manifest-create-side-by-side-assembly-manifest?view=msvc-170
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " /manifest:no")
+
+        # cl.exe CMAKE_CXX_COMPILER_ID flags
+        # https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=msvc-170
+        set(CMAKE_CXX_FLAGS "")
+        set(CMAKE_CXX_FLAGS_DEBUG "")
+        set(CMAKE_CXX_FLAGS_RELEASE "")
+
+        # complete debugging information
+        string(APPEND CMAKE_CXX_FLAGS " /Zi")
+
+        # real preprocessor
+        string(APPEND CMAKE_CXX_FLAGS " /Zc:preprocessor")
+
+        # undocumented option to generate "enhanced debugging information for optimized code"
+        # https://learn.microsoft.com/en-us/cpp/build/reference/zo-enhance-optimized-debugging?view=msvc-170
+        string(APPEND CMAKE_CXX_FLAGS " /d2Zi+")
+
+        # packaged functions
+        # https://learn.microsoft.com/en-us/cpp/build/reference/gy-enable-function-level-linking?view=msvc-170
+        string(APPEND CMAKE_CXX_FLAGS " /Gy")
+
+        # Eliminate duplicate strings
+        string(APPEND CMAKE_CXX_FLAGS " /GF")
+
+        # Disable RTTI
+        string(APPEND CMAKE_CXX_FLAGS " /GR-")
+
+        # Disable exceptions?
+        # https://learn.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=msvc-170
+        string(APPEND CMAKE_CXX_FLAGS " /EHs-")
+        string(APPEND CMAKE_CXX_FLAGS " /EHc-")
+        string(APPEND CMAKE_CXX_FLAGS " /EHa-")
+
+        # no copyright notice
+        string(APPEND CMAKE_CXX_FLAGS " /nologo")
+
+        # Full file paths in diagnostics text
+        string(APPEND CMAKE_CXX_FLAGS " /FC")
+
+        # Deprecated? No minimal build?
+        string(APPEND CMAKE_CXX_FLAGS " /Gm-")
+
+        # Diagnostics format
+        # https://learn.microsoft.com/en-us/cpp/build/reference/diagnostics-compiler-diagnostic-options?view=msvc-170
+        string(APPEND CMAKE_CXX_FLAGS " /diagnostics:column")
+
+        # Floating point options
+        # https://learn.microsoft.com/en-us/cpp/build/reference/fp-specify-floating-point-behavior?view=msvc-170
+        string(APPEND CMAKE_CXX_FLAGS " /fp:fast")
+        string(APPEND CMAKE_CXX_FLAGS " /fp:except-")
+
+        # DEBUG
+        # No optimization
+        string(APPEND CMAKE_CXX_FLAGS_DEBUG " /Od")
+
+        # RELEASE
+        # Optimization
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /Oi")
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /Oxb2")
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /O2")
+
+    elseif (_COMPILER MATCHES ".*clang.*.exe")
+        # TODO: clang specific settings
+        set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+    endif()
+
+    # we're dangerous
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS=1)
+    add_compile_definitions(WIN32_LEAN_AND_MEAN=1)
+
+    # Clear standard libraries, set the ones you want with LIBRARIES @Windows <libs>
+    # in add_exe(...).
+    set(CMAKE_C_STANDARD_LIBRARIES   "" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
+endif()

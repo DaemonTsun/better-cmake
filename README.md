@@ -10,10 +10,8 @@ Installing and including from global paths also works.
 ## Installing (optional)
 
 ```sh
-$ mkdir bin
-$ cd bin
-$ cmake path/to/better-cmake
-$ sudo make install
+$ cmake <dir with CMakeLists.txt> <output dir>
+$ cmake --install <output dir>
 ```
 
 ## Usage
@@ -66,11 +64,44 @@ add_lib(NAME LINKAGE
     [SOURCES files...]          # extra sources, optional
     [INCLUDE_DIRS dirs...]      # extra include directories, optional
     [LINK_DIRS dirs...]         # extra directories to look at when linking, optional
-    [LIBRARIES libs...]         # libraries to link
+    [LIBRARIES libs... @]       # libraries to link
+    [SUBMODULES modules...]     # git submodules to include / pull
+    [EXT                        # better-cmake external dependencies
+      <LIB name version path [INCLUDE] [LINK] [GIT_SUBMODULE]>...
+    ]
+)
+
+add_exe(NAME
+    
+    [VERSION version]
+    [SOURCES_DIR dir]             # top directory of all source files, if "src" folder is present, can be omitted
+    [GENERATE_TARGET_HEADER file] # path to target header file
+    [CPP_VERSION version]         # defaults to 17 if omitted
+    [WINDOWS_SUBSYSTEM subsystem] # only "console" and "windows" are available thanks to CMake. Does not affect systems other than Windows.
+        
+    [CPP_WARNINGS warnings...]  # ALL, EXTRA, PEDANTIC or normal compiler args
+    [TESTS tests...]            # t1 tests or directories of tests
+    [SOURCES files...]          # extra sources, optional
+    [INCLUDE_DIRS dirs...]      # extra include directories, optional
+    [LINK_DIRS dirs...]         # extra directories to look at when linking, optional
+    [LIBRARIES libs... @]       # libraries to link
+    [SUBMODULES modules...]     # git submodules to include / pull
     [EXT                        # better-cmake external dependencies
       <LIB name version path [INCLUDE] [LINK] [GIT_SUBMODULE]>...
     ]
 )
 ```
 
-`add_exe` is the same as `add_lib` except theres no `LINKAGE` or `PIE` options.
+Options marked with a `@` may also use the platform syntax for adding options only for specific operating systems, e.g.:
+
+```cmake
+add_exe(my_cool_exe
+    SOURCES main.cpp
+
+    # this adds zlib to all platforms, pthread and x11 to Linux only and kernel32 and user32 to Windows only.
+    LIBRARIES
+        zlib
+        @Linux pthread x11
+        @Windows kernel32 user32
+```
+
