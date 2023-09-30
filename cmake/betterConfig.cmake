@@ -508,6 +508,8 @@ macro(get_cpp_warnings OUT_VAR)
                 "/wd4514" # C4514: unreferenced inline function
                 "/wd4577" # C4577: noexcept with exception handling disabled
                 "/wd4668" # C4668: not defined as a preprocessor macro, replacing with '0'
+                "/wd4710" # C4710: function not inlined
+                "/wd4711" # C4711: automatic inline expansion
                 "/wd4820" # C4820: added padding at end of struct
                 "/wd5039" # C5039: extern C exceptions
                 "/wd5045" # C5045: spectre
