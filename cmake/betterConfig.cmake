@@ -1,7 +1,8 @@
 
-# version 2.2
-# new in version 2.2: better MSVC support
-# new in version 2: some Windows support
+# version 2.3
+# version 2.3: compiler and linker flags
+# version 2.2: better MSVC support
+# version 2:   some Windows support
 
 set(BETTER_CMAKE_VERSION_MAJOR 2)
 set(BETTER_CMAKE_VERSION_MINOR 2)
@@ -14,6 +15,14 @@ message(VERBOSE "better-cmake v${BETTER_CMAKE_VERSION} from ${ROOT}")
 # defaults
 set(better_DEFAULT_CXX_STANDARD 17)
 
+set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_DEBUG "" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
 
 # build type, SOMEHOW if you don't specify CMAKE_BUILD_TYPE, you get
 # neither Debug nor Release. amazing work CMake.
@@ -329,6 +338,8 @@ macro(export_target_variables NAME)
     set_export(${NAME}_INCLUDE_DIRS)
     set(${NAME}_INCLUDE_DIRECTORIES ${${NAME}_INCLUDE_DIRS})
     set_export(${NAME}_INCLUDE_DIRECTORIES)
+    set_export(${NAME}_COMPILE_FLAGS)
+    set_export(${NAME}_LINK_FLAGS)
     set_export(${NAME}_LINK_DIRS)
     set_export(${NAME}_HEADERS)
     set_export(${NAME}_ROOT)
@@ -747,6 +758,249 @@ macro(add_target_libraries TARGET)
     endif()
 endmacro()
 
+# add_target_compile_flags: add compiler flags to the given target.
+# use "Default" to set default flags.
+# supports compiler-specific flags with @, e.g.:
+#
+#   add_target_compile_flags(${myLib_TARGET}
+#                            @GNU -O0
+#                            @MSVC /Zi)
+#
+macro(add_target_compile_flags TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # cl.exe compiler flags
+            # https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=msvc-170
+
+            # complete debugging information
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Zi")
+
+            # real preprocessor
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Zc:preprocessor")
+
+            # undocumented option to generate "enhanced debugging information for optimized code"
+            # https://learn.microsoft.com/en-us/cpp/build/reference/zo-enhance-optimized-debugging?view=msvc-170
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/d2Zi+")
+
+            # packaged functions
+            # https://learn.microsoft.com/en-us/cpp/build/reference/gy-enable-function-level-linking?view=msvc-170
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Gy")
+
+            # Eliminate duplicate strings
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/GF")
+
+            # Disable RTTI
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/GR-")
+
+            # Disable exceptions?
+            # https://learn.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=msvc-170
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHs-")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHc-")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHa-")
+
+            # no copyright notice
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/nologo")
+
+            # Full file paths in diagnostics text
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/FC")
+
+            # Deprecated? No minimal build?
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Gm-")
+
+            # Diagnostics format
+            # https://learn.microsoft.com/en-us/cpp/build/reference/diagnostics-compiler-diagnostic-options?view=msvc-170
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/diagnostics:column")
+
+            # Floating point options
+            # https://learn.microsoft.com/en-us/cpp/build/reference/fp-specify-floating-point-behavior?view=msvc-170
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/fp:fast")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/fp:except-")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_compile_flags_debug: add compiler flags to the given target when
+# building a debug build.
+# use "Default" to set default flags.
+macro(add_target_compile_flags_debug TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # No optimization
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Od")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_compile_flags_release: add compiler flags to the given target when
+# building a release build.
+# use "Default" to set default flags.
+macro(add_target_compile_flags_release TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # Optimization
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Oi")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Oxb2")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/O2")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_COMPILE_FLAGS" ${_ADD_TARGET_COMPILE_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_link_flags: add linker flags to the given target.
+# use "Default" to set default flags.
+# supports compiler-specific flags with @, e.g.:
+#
+#   add_target_link_flags(${myLib_TARGET}
+#                            @MSVC /incremental:no)
+#
+macro(add_target_link_flags TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_LINK_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_LINK_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # TODO
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            list(APPEND "${TARGET}_LINK_FLAGS" "/fp:except-")
+            # doesn't create an incremental build
+            # https://learn.microsoft.com/en-us/cpp/build/reference/incremental-link-incrementally?view=msvc-170
+            list(APPEND "${TARGET}_LINK_FLAGS" "/incremental:no")
+
+            # removes unused definitions
+            # https://learn.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=msvc-170
+            list(APPEND "${TARGET}_LINK_FLAGS" "/opt:ref")
+            list(APPEND "${TARGET}_LINK_FLAGS" "/machine:x64")
+
+            # let's not generate a manifest file
+            # https://learn.microsoft.com/en-us/cpp/build/reference/manifest-create-side-by-side-assembly-manifest?view=msvc-170
+            list(APPEND "${TARGET}_LINK_FLAGS" "/manifest:no")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_link_flags_debug: add linker debug flags to the given target.
+# use "Default" to set default flags.
+macro(add_target_link_flags_debug TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_LINK_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_LINK_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # nothing
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # nothing
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # nothing
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_link_flags_release: add linker release flags to the given target.
+# use "Default" to set default flags.
+macro(add_target_link_flags_release TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_LINK_FLAGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_LINK_FLAGS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # nothing
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # nothing
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # nothing
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_LINK_FLAGS" ${_ADD_TARGET_LINK_FLAGS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+
 macro(_add_target NAME)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS
@@ -759,6 +1013,12 @@ macro(_add_target NAME)
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        COMPILE_FLAGS           # compiler flags
+        COMPILE_FLAGS_DEBUG     # debug compiler flags
+        COMPILE_FLAGS_RELEASE   # release compiler flags
+        LINK_FLAGS              # linker flags
+        LINK_FLAGS_DEBUG        # debug linker flags
+        LINK_FLAGS_RELEASE      # release linker flags
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # better-cmake external dependencies
@@ -823,6 +1083,46 @@ macro(_add_target NAME)
         list(APPEND "${_NAME}_INCLUDE_DIRS" ${_ADD_TARGET_INCLUDE_DIRS})
     endif()
 
+    if (DEFINED _ADD_TARGET_COMPILE_FLAGS)
+        add_target_compile_flags("${_NAME}" ${_ADD_TARGET_COMPILE_FLAGS})
+    else()
+        add_target_compile_flags("${_NAME}" Default)
+    endif()
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        if (DEFINED _ADD_TARGET_COMPILE_FLAGS_DEBUG)
+            add_target_compile_flags_debug("${_NAME}" ${_ADD_TARGET_COMPILE_FLAGS_DEBUG})
+        else()
+            add_target_compile_flags_debug("${_NAME}" Default)
+        endif()
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+        if (DEFINED _ADD_TARGET_COMPILE_FLAGS_RELEASE)
+            add_target_compile_flags_release("${_NAME}" ${_ADD_TARGET_COMPILE_FLAGS_RELEASE})
+        else()
+            add_target_compile_flags_release("${_NAME}" Default)
+        endif()
+    endif()
+
+    if (DEFINED _ADD_TARGET_LINK_FLAGS)
+        add_target_link_flags("${_NAME}" ${_ADD_TARGET_LINK_FLAGS})
+    else()
+        add_target_link_flags("${_NAME}" Default)
+    endif()
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        if (DEFINED _ADD_TARGET_LINK_FLAGS_DEBUG)
+            add_target_link_flags_debug("${_NAME}" ${_ADD_TARGET_LINK_FLAGS_DEBUG})
+        else()
+            add_target_link_flags_debug("${_NAME}" Default)
+        endif()
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+        if (DEFINED _ADD_TARGET_LINK_FLAGS_RELEASE)
+            add_target_link_flags_release("${_NAME}" ${_ADD_TARGET_LINK_FLAGS_RELEASE})
+        else()
+            add_target_link_flags_release("${_NAME}" Default)
+        endif()
+    endif()
+
     if (DEFINED _ADD_TARGET_LINK_DIRS)
         list(APPEND "${_NAME}_LINK_DIRS" ${_ADD_TARGET_LINK_DIRS})
     endif()
@@ -841,7 +1141,15 @@ macro(_add_target NAME)
 
     target_include_directories(${_NAME} PRIVATE "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS})
 
-    if (DEFINED ${_NAME}_LINK_DIRS)
+    if (DEFINED "${_NAME}_COMPILE_FLAGS")
+        target_compile_options("${_NAME}" PRIVATE ${${_NAME}_COMPILE_FLAGS})
+    endif()
+
+    if (DEFINED "${_NAME}_LINK_FLAGS")
+        target_link_options("${_NAME}" PRIVATE ${${_NAME}_LINK_FLAGS})
+    endif()
+
+    if (DEFINED "${_NAME}_LINK_DIRS")
         target_link_directories(${_NAME} PRIVATE ${${_NAME}_LINK_DIRS})
     endif()
 
@@ -870,6 +1178,12 @@ macro(add_lib NAME LINKAGE)
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        COMPILE_FLAGS           # compiler flags
+        COMPILE_FLAGS_DEBUG     # debug compiler flags
+        COMPILE_FLAGS_RELEASE   # release compiler flags
+        LINK_FLAGS              # linker flags
+        LINK_FLAGS_DEBUG        # debug linker flags
+        LINK_FLAGS_RELEASE      # release linker flags
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # better-cmake external dependencies
@@ -914,13 +1228,17 @@ macro(add_lib NAME LINKAGE)
                         if (IS_DIRECTORY "${_TEST}")
                             add_test_directory("${_TEST}"
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                COMPILE_FLAGS ${${_NAME}_COMPILE_FLAGS}
+                                LINK_FLAGS ${${_NAME}_LINK_FLAGS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 )
                         else()
-                            add_test("${_TEST}"
+                            add_t1_test("${_TEST}"
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                COMPILE_FLAGS ${${_NAME}_COMPILE_FLAGS}
+                                LINK_FLAGS ${${_NAME}_LINK_FLAGS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
@@ -950,6 +1268,12 @@ macro(add_exe NAME)
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
+        COMPILE_FLAGS           # compiler flags
+        COMPILE_FLAGS_DEBUG     # debug compiler flags
+        COMPILE_FLAGS_RELEASE   # release compiler flags
+        LINK_FLAGS              # linker flags
+        LINK_FLAGS_DEBUG        # debug linker flags
+        LINK_FLAGS_RELEASE      # release linker flags
         LINK_DIRS               # extra directories to look at when linking, optional
         LIBRARIES               # libraries to link
         EXT                     # better-cmake external dependencies
@@ -1000,13 +1324,17 @@ macro(add_exe NAME)
                             add_test_directory("${_TEST}"
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
                                 LIBRARIES ${${_NAME}_LIBRARIES}
+                                COMPILE_FLAGS ${${_NAME}_COMPILE_FLAGS}
+                                LINK_FLAGS ${${_NAME}_LINK_FLAGS}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 )
                         else()
-                            add_test("${_TEST}"
+                            add_t1_test("${_TEST}"
                                 INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
                                 LIBRARIES ${${_NAME}_LIBRARIES}
+                                COMPILE_FLAGS ${${_NAME}_COMPILE_FLAGS}
+                                LINK_FLAGS ${${_NAME}_LINK_FLAGS}
                                 CPP_VERSION ${${_NAME}_CPP_VERSION}
                                 CPP_WARNINGS ${${_NAME}_CPP_WARNINGS}
                                 )
@@ -1264,98 +1592,6 @@ if (Windows)
     message(VERBOSE "VSCMD_ARG_TGT_ARCH $ENV{VSCMD_ARG_TGT_ARCH}")
     message(VERBOSE "Platform $ENV{Platform}")
     message(VERBOSE "is_x64_arch $ENV{is_x64_arch}")
-
-
-    # I THINK CMAKE_CXX_COMPILER is set before project() on Windows.
-    get_filename_component(_COMPILER "${CMAKE_CXX_COMPILER}" NAME)
-
-    if (_COMPILER MATCHES ".*cl.exe")
-        # Linker flags
-        set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
-        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
-        # doesn't create an incremental build
-        # https://learn.microsoft.com/en-us/cpp/build/reference/incremental-link-incrementally?view=msvc-170
-        string(APPEND CMAKE_EXE_LINKER_FLAGS " /incremental:no")
-
-        # By default DEBUG flags are /debug /INCREMENTAL, we don't want that.
-        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "")
-
-        # removes unused definitions
-        # https://learn.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=msvc-170
-        string(APPEND CMAKE_EXE_LINKER_FLAGS " /opt:ref")
-        string(APPEND CMAKE_EXE_LINKER_FLAGS " /machine:x64")
-
-        # let's not generate a manifest file
-        # https://learn.microsoft.com/en-us/cpp/build/reference/manifest-create-side-by-side-assembly-manifest?view=msvc-170
-        string(APPEND CMAKE_EXE_LINKER_FLAGS " /manifest:no")
-
-        # cl.exe CMAKE_CXX_COMPILER_ID flags
-        # https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=msvc-170
-        set(CMAKE_CXX_FLAGS "")
-        set(CMAKE_CXX_FLAGS_DEBUG "")
-        set(CMAKE_CXX_FLAGS_RELEASE "")
-
-        # complete debugging information
-        string(APPEND CMAKE_CXX_FLAGS " /Zi")
-
-        # real preprocessor
-        string(APPEND CMAKE_CXX_FLAGS " /Zc:preprocessor")
-
-        # undocumented option to generate "enhanced debugging information for optimized code"
-        # https://learn.microsoft.com/en-us/cpp/build/reference/zo-enhance-optimized-debugging?view=msvc-170
-        string(APPEND CMAKE_CXX_FLAGS " /d2Zi+")
-
-        # packaged functions
-        # https://learn.microsoft.com/en-us/cpp/build/reference/gy-enable-function-level-linking?view=msvc-170
-        string(APPEND CMAKE_CXX_FLAGS " /Gy")
-
-        # Eliminate duplicate strings
-        string(APPEND CMAKE_CXX_FLAGS " /GF")
-
-        # Disable RTTI
-        string(APPEND CMAKE_CXX_FLAGS " /GR-")
-
-        # Disable exceptions?
-        # https://learn.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=msvc-170
-        string(APPEND CMAKE_CXX_FLAGS " /EHs-")
-        string(APPEND CMAKE_CXX_FLAGS " /EHc-")
-        string(APPEND CMAKE_CXX_FLAGS " /EHa-")
-
-        # no copyright notice
-        string(APPEND CMAKE_CXX_FLAGS " /nologo")
-
-        # Full file paths in diagnostics text
-        string(APPEND CMAKE_CXX_FLAGS " /FC")
-
-        # Deprecated? No minimal build?
-        string(APPEND CMAKE_CXX_FLAGS " /Gm-")
-
-        # Diagnostics format
-        # https://learn.microsoft.com/en-us/cpp/build/reference/diagnostics-compiler-diagnostic-options?view=msvc-170
-        string(APPEND CMAKE_CXX_FLAGS " /diagnostics:column")
-
-        # Floating point options
-        # https://learn.microsoft.com/en-us/cpp/build/reference/fp-specify-floating-point-behavior?view=msvc-170
-        string(APPEND CMAKE_CXX_FLAGS " /fp:fast")
-        string(APPEND CMAKE_CXX_FLAGS " /fp:except-")
-
-        # DEBUG
-        # No optimization
-        string(APPEND CMAKE_CXX_FLAGS_DEBUG " /Od")
-
-        # RELEASE
-        # Optimization
-        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /Oi")
-        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /Oxb2")
-        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /O2")
-
-    elseif (_COMPILER MATCHES ".*clang.*.exe")
-        # TODO: clang specific settings
-        set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
-        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
-    endif()
 
     # we're dangerous
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS=1)
