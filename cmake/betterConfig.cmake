@@ -17,7 +17,7 @@ set(better_DEFAULT_CXX_STANDARD 17)
 
 set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-set(CMAKE_CXX_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG" CACHE STRING "" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "" CACHE STRING "" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "" CACHE STRING "" FORCE)
@@ -851,7 +851,8 @@ macro(add_target_compile_flags_debug TARGET)
     
     if (_ADD_TARGET_COMPILE_FLAGS_Default)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-            # TODO
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-g")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-O0")
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # TODO
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -881,7 +882,7 @@ macro(add_target_compile_flags_release TARGET)
     
     if (_ADD_TARGET_COMPILE_FLAGS_Default)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-            # TODO
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-O3")
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # TODO
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
