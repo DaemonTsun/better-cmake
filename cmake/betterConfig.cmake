@@ -459,7 +459,7 @@ endmacro()
 macro(get_cpp_warnings OUT_VAR)
     set(_OPTIONS ALL EXTRA PEDANTIC SANE FATAL)
     set(_SINGLE_VAL_ARGS)
-    set(_MULTI_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
 
     cmake_parse_arguments(TARGET_CPP_WARNINGS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
     
@@ -525,6 +525,10 @@ macro(get_cpp_warnings OUT_VAR)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
             list(APPEND ${OUT_VAR} "/WX")
         endif()
+    endif()
+
+    if (DEFINED "TARGET_CPP_WARNINGS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND ${OUT_VAR} ${TARGET_CPP_WARNINGS_\@${CMAKE_CXX_COMPILER_ID}})
     endif()
 
     if (DEFINED TARGET_CPP_WARNINGS_UNPARSED_ARGUMENTS)
