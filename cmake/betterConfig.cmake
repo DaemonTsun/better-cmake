@@ -906,6 +906,88 @@ macro(add_target_compile_flags_release TARGET)
     endif()
 endmacro()
 
+# add_target_compile_definitions: add compiler definitions to the given target.
+# use "Default" to set default definitions.
+# supports platform-specific definitions with @, e.g.:
+#
+#   add_target_compile_definitions(${myLib_TARGET}
+#                                  @Windows -DUNICODE=1)
+#
+macro(add_target_compile_definitions TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @Linux @Windows @Mac)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_DEFINITIONS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_DEFINITIONS_Default)
+        if (WIN32)
+            # UNICODE to make macro Win32 functions use the W overload
+            list(APPEND "${TARGET}_COMPILE_DEFINITIONS" "-DUNICODE=1")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_DEFINITIONS_\@${Platform}")
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_\@${Platform}})
+    endif()
+endmacro()
+
+# add_target_compile_definitions_debug: add compiler definitions to the given target when
+# building a debug build.
+# use "Default" to set default definitions.
+macro(add_target_compile_definitions_debug TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_DEFINITIONS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_DEFINITIONS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_DEFINITIONS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
+# add_target_compile_definitions_release: add compiler definitions to the given target when
+# building a release build.
+# use "Default" to set default definitions.
+macro(add_target_compile_definitions_release TARGET)
+    set(_OPTIONS Default)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @GNU @Clang @MSVC)
+
+    cmake_parse_arguments(_ADD_TARGET_COMPILE_DEFINITIONS "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    if (_ADD_TARGET_COMPILE_DEFINITIONS_Default)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        endif()
+    endif()
+    
+    if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS)
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_COMPILE_DEFINITIONS_\@${CMAKE_CXX_COMPILER_ID}")
+        list(APPEND "${TARGET}_COMPILE_DEFINITIONS" ${_ADD_TARGET_COMPILE_DEFINITIONS_\@${CMAKE_CXX_COMPILER_ID}})
+    endif()
+endmacro()
+
 # add_target_link_flags: add linker flags to the given target.
 # use "Default" to set default flags.
 # supports compiler-specific flags with @, e.g.:
@@ -1023,6 +1105,9 @@ macro(_add_target NAME)
         COMPILE_FLAGS           # compiler flags
         COMPILE_FLAGS_DEBUG     # debug compiler flags
         COMPILE_FLAGS_RELEASE   # release compiler flags
+        COMPILE_DEFINITIONS           # definitions
+        COMPILE_DEFINITIONS_DEBUG     # debug definitions
+        COMPILE_DEFINITIONS_RELEASE   # release definitions
         LINK_FLAGS              # linker flags
         LINK_FLAGS_DEBUG        # debug linker flags
         LINK_FLAGS_RELEASE      # release linker flags
@@ -1090,6 +1175,7 @@ macro(_add_target NAME)
         list(APPEND "${_NAME}_INCLUDE_DIRS" ${_ADD_TARGET_INCLUDE_DIRS})
     endif()
 
+    # Compile flags
     if (DEFINED _ADD_TARGET_COMPILE_FLAGS)
         add_target_compile_flags("${_NAME}" ${_ADD_TARGET_COMPILE_FLAGS})
     else()
@@ -1110,6 +1196,28 @@ macro(_add_target NAME)
         endif()
     endif()
 
+    # definitions
+    if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS)
+        add_target_compile_definitions("${_NAME}" ${_ADD_TARGET_COMPILE_DEFINITIONS})
+    else()
+        add_target_compile_definitions("${_NAME}" Default)
+    endif()
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS_DEBUG)
+            add_target_compile_definitions_debug("${_NAME}" ${_ADD_TARGET_COMPILE_DEFINITIONS_DEBUG})
+        else()
+            add_target_compile_definitions_debug("${_NAME}" Default)
+        endif()
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+        if (DEFINED _ADD_TARGET_COMPILE_DEFINITIONS_RELEASE)
+            add_target_compile_definitions_release("${_NAME}" ${_ADD_TARGET_COMPILE_DEFINITIONS_RELEASE})
+        else()
+            add_target_compile_definitions_release("${_NAME}" Default)
+        endif()
+    endif()
+
+    # Link flags
     if (DEFINED _ADD_TARGET_LINK_FLAGS)
         add_target_link_flags("${_NAME}" ${_ADD_TARGET_LINK_FLAGS})
     else()
@@ -1152,6 +1260,10 @@ macro(_add_target NAME)
         target_compile_options("${_NAME}" PRIVATE ${${_NAME}_COMPILE_FLAGS})
     endif()
 
+    if (DEFINED "${_NAME}_COMPILE_DEFINITIONS")
+        target_compile_definitions("${_NAME}" PRIVATE ${${_NAME}_COMPILE_DEFINITIONS})
+    endif()
+
     if (DEFINED "${_NAME}_LINK_FLAGS")
         target_link_options("${_NAME}" PRIVATE ${${_NAME}_LINK_FLAGS})
     endif()
@@ -1188,6 +1300,9 @@ macro(add_lib NAME LINKAGE)
         COMPILE_FLAGS           # compiler flags
         COMPILE_FLAGS_DEBUG     # debug compiler flags
         COMPILE_FLAGS_RELEASE   # release compiler flags
+        COMPILE_DEFINITIONS           # definitions
+        COMPILE_DEFINITIONS_DEBUG     # debug definitions
+        COMPILE_DEFINITIONS_RELEASE   # release definitions
         LINK_FLAGS              # linker flags
         LINK_FLAGS_DEBUG        # debug linker flags
         LINK_FLAGS_RELEASE      # release linker flags
@@ -1278,6 +1393,9 @@ macro(add_exe NAME)
         COMPILE_FLAGS           # compiler flags
         COMPILE_FLAGS_DEBUG     # debug compiler flags
         COMPILE_FLAGS_RELEASE   # release compiler flags
+        COMPILE_DEFINITIONS           # definitions
+        COMPILE_DEFINITIONS_DEBUG     # debug definitions
+        COMPILE_DEFINITIONS_RELEASE   # release definitions
         LINK_FLAGS              # linker flags
         LINK_FLAGS_DEBUG        # debug linker flags
         LINK_FLAGS_RELEASE      # release linker flags
