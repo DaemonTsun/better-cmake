@@ -862,6 +862,10 @@ macro(add_target_compile_flags_debug TARGET)
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             # No optimization
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/Od")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/MDd")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Zi")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Ob0")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/RTC1")
         endif()
     endif()
     
@@ -894,6 +898,8 @@ macro(add_target_compile_flags_release TARGET)
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/Oi")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/Oxb2")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/O2")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/DNDBUG")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/MD")
         endif()
     endif()
     
@@ -1048,7 +1054,7 @@ macro(add_target_link_flags_debug TARGET)
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # nothing
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-            # nothing
+            list(APPEND "${TARGET}_LINK_FLAGS" "/debug")
         endif()
     endif()
     
