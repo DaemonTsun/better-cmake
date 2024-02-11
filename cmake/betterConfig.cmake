@@ -6,7 +6,7 @@
 # version 2:   some Windows support
 
 set(BETTER_CMAKE_VERSION_MAJOR 2)
-set(BETTER_CMAKE_VERSION_MINOR 2)
+set(BETTER_CMAKE_VERSION_MINOR 4)
 set(BETTER_CMAKE_VERSION "${BETTER_CMAKE_VERSION_MAJOR}.${BETTER_CMAKE_VERSION_MINOR}")
 set(ROOT     "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
@@ -1614,6 +1614,248 @@ endmacro()
 # =======
 # WINDOWS
 # =======
+macro(set_up_msvc_environment)
+    set_cache(Compiler "MSVC")
+    # time to set "developer prompt" variables manually
+
+    # VSINSTALLDIR is the directory Visual Studio is installed in.
+    # If not set (it probably won't be unless you start a Developer Prompt
+    # or run vcvarsall.bat), we try to find the latest version.
+    if (NOT DEFINED ENV{VSINSTALLDIR})
+        set(_vs_search_path "C:/Program Files/Microsoft Visual Studio")
+        file(GLOB _vs_versions "${_vs_search_path}/*/*")
+
+        if (NOT _vs_versions)
+            message(FATAL_ERROR "Could not set VSINSTALLDIR: no Visual Studio installation found in ${_vs_search_path}.\nSet environment variable VSINSTALLDIR if Visual Studio is installed elsewhere.")
+        endif()
+
+        list(SORT _vs_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vs_versions 0 _vs_current_version)
+        set(ENV{VSINSTALLDIR} "${_vs_current_version}")
+    endif()
+
+    message(VERBOSE "VSINSTALLDIR: $ENV{VSINSTALLDIR}")
+
+    # VSINSTALLDIR: MSVC installation directory.
+    if (NOT DEFINED ENV{VCINSTALLDIR})
+        if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC")
+            message(FATAL_ERROR "Could not set VCINSTALLDIR: Visual Studio is installed but no VC installation found in $ENV{VSINSTALLDIR}/VC. Run Visual Studio and install VC.")
+        endif()
+
+        set(ENV{VCINSTALLDIR} "$ENV{VSINSTALLDIR}/VC")
+    endif()
+
+    message(VERBOSE "VCINSTALLDIR: $ENV{VCINSTALLDIR}")
+
+    # VS170COMNTOOLS: Common7/Tools
+    if (NOT DEFINED ENV{VS170COMNTOOLS})
+        if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/Common7/Tools")
+            message(FATAL_ERROR "Could not set VS170COMNTOOLS: Visual Studio is installed but no Common7/Tools directory was found in installation found at $ENV{VSINSTALLDIR}/Common7/Tools.")
+        endif()
+
+        set(ENV{VS170COMNTOOLS} "$ENV{VSINSTALLDIR}/Common7/Tools")
+    endif()
+
+    message(VERBOSE "VS170COMNTOOLS: $ENV{VS170COMNTOOLS}")
+
+    # VCToolsInstallDir: The versioned directory where MSVC tools like cl.exe (compiler)
+    # and other tools are installed in.
+    if (NOT DEFINED ENV{VCToolsInstallDir})
+        file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Tools/MSVC/*")
+
+        if (NOT _vc_versions)
+            message(FATAL_ERROR "No MSVC tools found in $ENV{VCINSTALLDIR}/Tools/MSVC/. Check your MSVC installation.")
+        endif()
+
+        list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vc_versions 0 _vc_current_version)
+        set(ENV{VCToolsInstallDir} "${_vc_current_version}")
+    endif()
+
+    message(VERBOSE "VCToolsInstallDir $ENV{VCToolsInstallDir}")
+
+    # VCToolsVersion: version of the MSVC tools.
+    if (NOT DEFINED ENV{VCToolsVersion})
+        get_filename_component(_vc_version "$ENV{VCToolsInstallDir}" NAME)
+        set(ENV{VCToolsVersion} "${_vc_version}")
+    endif()
+
+    message(VERBOSE "VCToolsVersion $ENV{VCToolsVersion}")
+
+    # VCToolsRedistDir: The versioned directory where MSVC tools like cl.exe (compiler)
+    # and other tools are installed in.
+    if (NOT DEFINED ENV{VCToolsRedistDir})
+        file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Redist/MSVC/[0-9]*")
+
+        if (NOT _vc_versions)
+            message(FATAL_ERROR "No MSVC redistributables found in $ENV{VCINSTALLDIR}/Redist/MSVC/. Check your MSVC installation.")
+        endif()
+
+        list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _vc_versions 0 _vc_current_version)
+        set(ENV{VCToolsRedistDir} "${_vc_current_version}")
+    endif()
+
+    message(VERBOSE "VCToolsRedistDir $ENV{VCToolsRedistDir}")
+
+    #Windows SDK
+    # WindowsSdkDir: the root path of the Windows SDK.
+    if (NOT DEFINED ENV{WindowsSdkDir})
+        set(_winsdk_search_path "C:/Program Files (x86)/Windows Kits")
+        file(GLOB _winsdk_versions "${_winsdk_search_path}/[0-9]*")
+
+        if (NOT _winsdk_versions)
+            message(FATAL_ERROR "Could not set WindowsSdkDir: no Windows Kits installation found in ${_winsdk_search_path}.\nSet environment variable WindowsSdkDir if installation path is elsewhere.")
+        endif()
+
+        list(SORT _winsdk_versions COMPARE NATURAL ORDER DESCENDING)
+        list(GET _winsdk_versions 0 _winsdk_current_version)
+        set(ENV{WindowsSdkDir} "${_winsdk_current_version}")
+    endif()
+
+    message(VERBOSE "WindowsSdkDir $ENV{WindowsSdkDir}")
+
+    set_default(ENV{WindowsSdkBinPath} "$ENV{WindowsSdkDir}/bin")
+
+    message(VERBOSE "WindowsSdkBinPath $ENV{WindowsSdkBinPath}")
+
+    # WindowsSdkVerBinPath: specific version of the Windows SDK binaries.
+    if (NOT DEFINED ENV{WindowsSdkVerBinPath})
+        file(GLOB _winsdk_verbins "$ENV{WindowsSdkBinPath}/[0-9]*")
+
+        if (NOT _winsdk_verbins)
+            message(FATAL_ERROR "Could not set WindowsSdkBinPath: no Windows SDK versions found in $ENV{WindowsSdkBinPath}.\nCheck your Windows SDK installation.")
+        endif()
+
+        list(SORT _winsdk_verbins COMPARE NATURAL ORDER DESCENDING)
+        list(GET _winsdk_verbins 0 _winsdk_bin_current_version)
+        set(ENV{WindowsSdkVerBinPath} "${_winsdk_bin_current_version}")
+    endif()
+
+    message(VERBOSE "WindowsSdkVerBinPath $ENV{WindowsSdkVerBinPath}")
+
+    # WindowsSDKVersion: the version of the Windows SDK
+    if (NOT DEFINED ENV{WindowsSDKVersion})
+        get_filename_component(_winsdk_version "$ENV{WindowsSdkVerBinPath}" NAME)
+        set_default(ENV{UCRTVersion} "${_winsdk_version}")
+        set(ENV{WindowsSDKVersion} "${_winsdk_version}/")
+    endif()
+
+    message(VERBOSE "WindowsSDKVersion $ENV{WindowsSDKVersion}")
+
+    set_default(ENV{WindowsSDKLibVersion} "$ENV{WindowsSDKVersion}")
+    message(VERBOSE "WindowsSDKLibVersion $ENV{WindowsSDKLibVersion}")
+
+    set_default(ENV{UniversalCRTSdkDir} "$ENV{WindowsSdkDir}")
+
+    
+
+    # include, link, path, ...
+    # (EXTERNAL_)INCLUDE: include paths
+    set(_INCLUDE "")
+    # Standard Library
+    list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/include")
+
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/include")
+        list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/atlmfc/include")
+    endif()
+
+    # VS Auxiliary libs
+    if (IS_DIRECTORY "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
+        list(APPEND _INCLUDE "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
+    endif()
+
+    # Windows kits universal CRT, winrt, um, ...
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}")
+        file(GLOB _includes "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}/*")
+        list(APPEND _INCLUDE ${_includes})
+    endif()
+
+    set(ENV{EXTERNAL_INCLUDE} "${_INCLUDE};$ENV{EXTERNAL_INCLUDE}")
+    message(VERBOSE "EXTERNAL_INCLUDE $ENV{EXTERNAL_INCLUDE}")
+
+    set(ENV{INCLUDE} "${_INCLUDE};$ENV{INCLUDE}")
+
+    include_directories($ENV{INCLUDE})
+    message(VERBOSE "INCLUDE $ENV{INCLUDE}")
+
+
+    # LIB: Library linking paths
+    set(_LIB "")
+    # Standard Library
+    list(APPEND _LIB "$ENV{VCToolsInstallDir}/lib/x64")
+
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+        list(APPEND _LIB "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+    endif()
+
+    # Windows kits universal CRT, um, ...
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
+        list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
+        list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
+    endif()
+
+    set(ENV{LIB} "${_LIB};$ENV{LIB}")
+    message(VERBOSE "LIB $ENV{LIB}")
+    link_directories($ENV{LIB})
+
+
+    # LIBPATH: yes
+    set(_LIBPATH "")
+    # Standard Library
+    list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x64")
+    
+    # ATL (COM objects)
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+        list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
+    endif()
+
+    # x86 references...?
+    if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/lib/x86/store/references")
+        list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x86/store/references")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
+        list(APPEND _LIBPATH "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
+    endif()
+
+    # PATH: search path
+    set(_PATH "")
+    list(APPEND _PATH "$ENV{VCToolsInstallDir}/bin/HostX64/x64")
+    list(APPEND _PATH "$ENV{WindowsSdkVerBinPath}/x64")
+    list(APPEND _PATH "$ENV{WindowsSdkBinPath}/x64")
+
+    if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
+        list(APPEND _PATH "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
+    endif()
+
+    if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
+        list(APPEND _PATH "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
+    endif()
+
+    set(ENV{__VSCMD_PREINIT_PATH} "$ENV{PATH}")
+    set(ENV{PATH} "${_PATH};$ENV{PATH}")
+
+    message(VERBOSE "PATH $ENV{PATH}")
+
+    # etc
+    set_default(ENV{VSCMD_ARG_app_plat} Desktop)
+    set_default(ENV{VSCMD_ARG_HOST_ARCH} x64)
+    set_default(ENV{VSCMD_ARG_TGT_ARCH} x64)
+    set_default(ENV{Platform} x64) # not to be confused with CMake variable Platform
+    set_default(ENV{is_x64_arch} true)
+
+    message(VERBOSE "VSCMD_ARG_app_plat $ENV{VSCMD_ARG_app_plat}")
+    message(VERBOSE "VSCMD_ARG_HOST_ARCH $ENV{VSCMD_ARG_HOST_ARCH}")
+    message(VERBOSE "VSCMD_ARG_TGT_ARCH $ENV{VSCMD_ARG_TGT_ARCH}")
+    message(VERBOSE "Platform $ENV{Platform}")
+    message(VERBOSE "is_x64_arch $ENV{is_x64_arch}")
+endmacro()
 
 if (Windows)
     message(VERBOSE "Checking for Windows compiler...")
@@ -1631,251 +1873,17 @@ if (Windows)
         message(VERBOSE "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER} (matches cl.exe)")
     endif()
 
-    if (Compiler STREQUAL "MSVC"
-            OR (NOT DEFINED Compiler AND (NOT DEFINED CMAKE_C_COMPILER OR NOT DEFINED CMAKE_CXX_COMPILER))
-            OR (CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$" OR CMAKE_CXX_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$"))
-
-        set_cache(Compiler "MSVC")
-        # time to set "developer prompt" variables manually
-
-        # VSINSTALLDIR is the directory Visual Studio is installed in.
-        # If not set (it probably won't be unless you start a Developer Prompt
-        # or run vcvarsall.bat), we try to find the latest version.
-        if (NOT DEFINED ENV{VSINSTALLDIR})
-            set(_vs_search_path "C:/Program Files/Microsoft Visual Studio")
-            file(GLOB _vs_versions "${_vs_search_path}/*/*")
-
-            if (NOT _vs_versions)
-                message(FATAL_ERROR "Could not set VSINSTALLDIR: no Visual Studio installation found in ${_vs_search_path}.\nSet environment variable VSINSTALLDIR if Visual Studio is installed elsewhere.")
-            endif()
-
-            list(SORT _vs_versions COMPARE NATURAL ORDER DESCENDING)
-            list(GET _vs_versions 0 _vs_current_version)
-            set(ENV{VSINSTALLDIR} "${_vs_current_version}")
-        endif()
-
-        message(VERBOSE "VSINSTALLDIR: $ENV{VSINSTALLDIR}")
-
-        # VSINSTALLDIR: MSVC installation directory.
-        if (NOT DEFINED ENV{VCINSTALLDIR})
-            if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC")
-                message(FATAL_ERROR "Could not set VCINSTALLDIR: Visual Studio is installed but no VC installation found in $ENV{VSINSTALLDIR}/VC. Run Visual Studio and install VC.")
-            endif()
-
-            set(ENV{VCINSTALLDIR} "$ENV{VSINSTALLDIR}/VC")
-        endif()
-
-        message(VERBOSE "VCINSTALLDIR: $ENV{VCINSTALLDIR}")
-
-        # VS170COMNTOOLS: Common7/Tools
-        if (NOT DEFINED ENV{VS170COMNTOOLS})
-            if (NOT IS_DIRECTORY "$ENV{VSINSTALLDIR}/Common7/Tools")
-                message(FATAL_ERROR "Could not set VS170COMNTOOLS: Visual Studio is installed but no Common7/Tools directory was found in installation found at $ENV{VSINSTALLDIR}/Common7/Tools.")
-            endif()
-
-            set(ENV{VS170COMNTOOLS} "$ENV{VSINSTALLDIR}/Common7/Tools")
-        endif()
-
-        message(VERBOSE "VS170COMNTOOLS: $ENV{VS170COMNTOOLS}")
-
-        # VCToolsInstallDir: The versioned directory where MSVC tools like cl.exe (compiler)
-        # and other tools are installed in.
-        if (NOT DEFINED ENV{VCToolsInstallDir})
-            file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Tools/MSVC/*")
-
-            if (NOT _vc_versions)
-                message(FATAL_ERROR "No MSVC tools found in $ENV{VCINSTALLDIR}/Tools/MSVC/. Check your MSVC installation.")
-            endif()
-
-            list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
-            list(GET _vc_versions 0 _vc_current_version)
-            set(ENV{VCToolsInstallDir} "${_vc_current_version}")
-        endif()
-
-        message(VERBOSE "VCToolsInstallDir $ENV{VCToolsInstallDir}")
-
-        # VCToolsVersion: version of the MSVC tools.
-        if (NOT DEFINED ENV{VCToolsVersion})
-            get_filename_component(_vc_version "$ENV{VCToolsInstallDir}" NAME)
-            set(ENV{VCToolsVersion} "${_vc_version}")
-        endif()
-
-        message(VERBOSE "VCToolsVersion $ENV{VCToolsVersion}")
-
-        # VCToolsRedistDir: The versioned directory where MSVC tools like cl.exe (compiler)
-        # and other tools are installed in.
-        if (NOT DEFINED ENV{VCToolsRedistDir})
-            file(GLOB _vc_versions "$ENV{VCINSTALLDIR}/Redist/MSVC/[0-9]*")
-
-            if (NOT _vc_versions)
-                message(FATAL_ERROR "No MSVC redistributables found in $ENV{VCINSTALLDIR}/Redist/MSVC/. Check your MSVC installation.")
-            endif()
-
-            list(SORT _vc_versions COMPARE NATURAL ORDER DESCENDING)
-            list(GET _vc_versions 0 _vc_current_version)
-            set(ENV{VCToolsRedistDir} "${_vc_current_version}")
-        endif()
-
-        message(VERBOSE "VCToolsRedistDir $ENV{VCToolsRedistDir}")
-
-        #Windows SDK
-        # WindowsSdkDir: the root path of the Windows SDK.
-        if (NOT DEFINED ENV{WindowsSdkDir})
-            set(_winsdk_search_path "C:/Program Files (x86)/Windows Kits")
-            file(GLOB _winsdk_versions "${_winsdk_search_path}/[0-9]*")
-
-            if (NOT _winsdk_versions)
-                message(FATAL_ERROR "Could not set WindowsSdkDir: no Windows Kits installation found in ${_winsdk_search_path}.\nSet environment variable WindowsSdkDir if installation path is elsewhere.")
-            endif()
-
-            list(SORT _winsdk_versions COMPARE NATURAL ORDER DESCENDING)
-            list(GET _winsdk_versions 0 _winsdk_current_version)
-            set(ENV{WindowsSdkDir} "${_winsdk_current_version}")
-        endif()
-
-        message(VERBOSE "WindowsSdkDir $ENV{WindowsSdkDir}")
-
-        set_default(ENV{WindowsSdkBinPath} "$ENV{WindowsSdkDir}/bin")
-
-        message(VERBOSE "WindowsSdkBinPath $ENV{WindowsSdkBinPath}")
-
-        # WindowsSdkVerBinPath: specific version of the Windows SDK binaries.
-        if (NOT DEFINED ENV{WindowsSdkVerBinPath})
-            file(GLOB _winsdk_verbins "$ENV{WindowsSdkBinPath}/[0-9]*")
-
-            if (NOT _winsdk_verbins)
-                message(FATAL_ERROR "Could not set WindowsSdkBinPath: no Windows SDK versions found in $ENV{WindowsSdkBinPath}.\nCheck your Windows SDK installation.")
-            endif()
-
-            list(SORT _winsdk_verbins COMPARE NATURAL ORDER DESCENDING)
-            list(GET _winsdk_verbins 0 _winsdk_bin_current_version)
-            set(ENV{WindowsSdkVerBinPath} "${_winsdk_bin_current_version}")
-        endif()
-
-        message(VERBOSE "WindowsSdkVerBinPath $ENV{WindowsSdkVerBinPath}")
-
-        # WindowsSDKVersion: the version of the Windows SDK
-        if (NOT DEFINED ENV{WindowsSDKVersion})
-            get_filename_component(_winsdk_version "$ENV{WindowsSdkVerBinPath}" NAME)
-            set_default(ENV{UCRTVersion} "${_winsdk_version}")
-            set(ENV{WindowsSDKVersion} "${_winsdk_version}/")
-        endif()
-
-        message(VERBOSE "WindowsSDKVersion $ENV{WindowsSDKVersion}")
-
-        set_default(ENV{WindowsSDKLibVersion} "$ENV{WindowsSDKVersion}")
-        message(VERBOSE "WindowsSDKLibVersion $ENV{WindowsSDKLibVersion}")
-
-        set_default(ENV{UniversalCRTSdkDir} "$ENV{WindowsSdkDir}")
-
-        
-
-        # include, link, path, ...
-        # (EXTERNAL_)INCLUDE: include paths
-        set(_INCLUDE "")
-        # Standard Library
-        list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/include")
-
-        # ATL (COM objects)
-        if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/include")
-            list(APPEND _INCLUDE "$ENV{VCToolsInstallDir}/atlmfc/include")
-        endif()
-
-        # VS Auxiliary libs
-        if (IS_DIRECTORY "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
-            list(APPEND _INCLUDE "$ENV{VCINSTALLDIR}/Auxiliary/VS/include")
-        endif()
-
-        # Windows kits universal CRT, winrt, um, ...
-        if (IS_DIRECTORY "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}")
-            file(GLOB _includes "$ENV{WindowsSdkDir}/include/$ENV{WindowsSDKVersion}/*")
-            list(APPEND _INCLUDE ${_includes})
-        endif()
-
-        set(ENV{EXTERNAL_INCLUDE} "${_INCLUDE};$ENV{EXTERNAL_INCLUDE}")
-        message(VERBOSE "EXTERNAL_INCLUDE $ENV{EXTERNAL_INCLUDE}")
-
-        set(ENV{INCLUDE} "${_INCLUDE};$ENV{INCLUDE}")
-
-        include_directories($ENV{INCLUDE})
-        message(VERBOSE "INCLUDE $ENV{INCLUDE}")
-
-
-        # LIB: Library linking paths
-        set(_LIB "")
-        # Standard Library
-        list(APPEND _LIB "$ENV{VCToolsInstallDir}/lib/x64")
-
-        # ATL (COM objects)
-        if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
-            list(APPEND _LIB "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
-        endif()
-
-        # Windows kits universal CRT, um, ...
-        if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
-            list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/ucrt/x64")
-        endif()
-
-        if (IS_DIRECTORY "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
-            list(APPEND _LIB "$ENV{WindowsSdkDir}/lib/$ENV{WindowsSDKVersion}/um/x64")
-        endif()
-
-        set(ENV{LIB} "${_LIB};$ENV{LIB}")
-        message(VERBOSE "LIB $ENV{LIB}")
-        link_directories($ENV{LIB})
-
-
-        # LIBPATH: yes
-        set(_LIBPATH "")
-        # Standard Library
-        list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x64")
-        
-        # ATL (COM objects)
-        if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
-            list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/atlmfc/lib/x64")
-        endif()
-
-        # x86 references...?
-        if (IS_DIRECTORY "$ENV{VCToolsInstallDir}/lib/x86/store/references")
-            list(APPEND _LIBPATH "$ENV{VCToolsInstallDir}/lib/x86/store/references")
-        endif()
-
-        if (IS_DIRECTORY "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
-            list(APPEND _LIBPATH "$ENV{WindowsSdkDir}/References/$ENV{WindowsSDKVersion}")
-        endif()
-
-        # PATH: search path
-        set(_PATH "")
-        list(APPEND _PATH "$ENV{VCToolsInstallDir}/bin/HostX64/x64")
-        list(APPEND _PATH "$ENV{WindowsSdkVerBinPath}/x64")
-        list(APPEND _PATH "$ENV{WindowsSdkBinPath}/x64")
-
-        if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
-            list(APPEND _PATH "$ENV{VSINSTALLDIR}/MSBuild/Current/Bin/amd64")
-        endif()
-
-        if (IS_DIRECTORY "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
-            list(APPEND _PATH "$ENV{VSINSTALLDIR}/VC/Tools/Llvm/x64/bin")
-        endif()
-
-        set(ENV{__VSCMD_PREINIT_PATH} "$ENV{PATH}")
-        set(ENV{PATH} "${_PATH};$ENV{PATH}")
-
-        message(VERBOSE "PATH $ENV{PATH}")
-
-        # etc
-        set_default(ENV{VSCMD_ARG_app_plat} Desktop)
-        set_default(ENV{VSCMD_ARG_HOST_ARCH} x64)
-        set_default(ENV{VSCMD_ARG_TGT_ARCH} x64)
-        set_default(ENV{Platform} x64) # not to be confused with CMake variable Platform
-        set_default(ENV{is_x64_arch} true)
-
-        message(VERBOSE "VSCMD_ARG_app_plat $ENV{VSCMD_ARG_app_plat}")
-        message(VERBOSE "VSCMD_ARG_HOST_ARCH $ENV{VSCMD_ARG_HOST_ARCH}")
-        message(VERBOSE "VSCMD_ARG_TGT_ARCH $ENV{VSCMD_ARG_TGT_ARCH}")
-        message(VERBOSE "Platform $ENV{Platform}")
-        message(VERBOSE "is_x64_arch $ENV{is_x64_arch}")
+    if (DEFINED Compiler AND Compiler STREQUAL "MSVC")
+        message(VERBOSE "Preferred compiler set to MSVC. Setting up environment...")
+        set_up_msvc_environment()
+    elseif (NOT DEFINED Compiler AND (NOT DEFINED CMAKE_C_COMPILER OR NOT DEFINED CMAKE_CXX_COMPILER))
+        message(VERBOSE "No compiler or preferred compiler set, using MSVC. Setting up environment...")
+        set_up_msvc_environment()
+    elseif (CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$" OR CMAKE_CXX_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$"))
+        message(VERBOSE "Detected cl.exe, using MSVC. Setting up environment...")
+        set_up_msvc_environment()
     elseif (Compiler STREQUAL "GNU")
+        message(VERBOSE "Preferred compiler set to GNU")
         set_cache(Compiler "GNU")
 
         set_default(CMAKE_C_COMPILER gcc)
@@ -1883,6 +1891,7 @@ if (Windows)
         set_default(CMAKE_C_LINK_EXECUTABLE ld)
         set_default(CMAKE_CXX_LINK_EXECUTABLE ld)
     elseif (Compiler STREQUAL "Clang")
+        message(VERBOSE "Preferred compiler set to Clang")
         set_cache(Compiler "Clang")
 
         set_default(CMAKE_C_COMPILER clang)
