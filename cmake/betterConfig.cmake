@@ -862,8 +862,8 @@ macro(add_target_compile_flags TARGET)
             # Disable exceptions?
             # https://learn.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=msvc-170
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHs-")
-            list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHc-")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHa-")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/EHc-")
 
             # no copyright notice
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/nologo")
