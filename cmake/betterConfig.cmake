@@ -1616,6 +1616,21 @@ endmacro()
 # =======
 
 if (Windows)
+    message(VERBOSE "Checking for Windows compiler...")
+    message(VERBOSE "Preferred Compiler: ${Compiler}")
+
+    if (CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$")
+        message(VERBOSE "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER} (not cl.exe)")
+    else()
+        message(VERBOSE "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER} (matches cl.exe)")
+    endif()
+
+    if (CMAKE_CXX_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$")
+        message(VERBOSE "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER} (not cl.exe)")
+    else()
+        message(VERBOSE "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER} (matches cl.exe)")
+    endif()
+
     if (Compiler STREQUAL "MSVC"
             OR (NOT DEFINED Compiler AND (NOT DEFINED CMAKE_C_COMPILER OR NOT DEFINED CMAKE_CXX_COMPILER))
             OR (CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$" OR CMAKE_CXX_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$"))
