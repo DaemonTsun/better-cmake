@@ -14,7 +14,7 @@ set(ROOT_BIN "${CMAKE_CURRENT_BINARY_DIR}")
 message(VERBOSE "better-cmake v${BETTER_CMAKE_VERSION} from ${ROOT}")
 
 # defaults
-set(better_DEFAULT_CXX_STANDARD 17)
+set(better_DEFAULT_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_DEBUG "" CACHE STRING "" FORCE)
@@ -30,10 +30,10 @@ set(CMAKE_CXX_COMPILER_WORKS 1)
 # this sets build type to Debug if not specified.
 if (DEFINED Build)
     set(CMAKE_BUILD_TYPE "${Build}" CACHE STRING "" FORCE)
-    set(Build "${Build}" CACHE STRING "" FORCE)
+    set(Build "${Build}" CACHE STRING "the build type" FORCE)
 elseif (NOT CMAKE_BUILD_TYPE)
     if (NOT DEFINED Build) 
-        set(Build Debug CACHE STRING "" FORCE)
+        set(Build Debug CACHE STRING "the build type" FORCE)
     endif()
 
     set(CMAKE_BUILD_TYPE "${Build}" CACHE STRING "" FORCE)
@@ -41,7 +41,11 @@ endif()
 
 # preferred compiler, is handled at the bottom
 if (DEFINED Compiler)
-    set(Compiler "${Compiler}" CACHE STRING "" FORCE)
+    set(Compiler "${Compiler}" CACHE STRING "the preferred compiler" FORCE)
+endif()
+
+if (DEFINED Tests)
+    set(Tests "${Tests}" CACHE STRING "whether or not to build tests" FORCE)
 endif()
 
 # basic functionality
@@ -101,6 +105,7 @@ cmake_policy(SET CMP0048 NEW)
 
 find_program(git_PROGRAM git)
 
+# some functions
 macro(get_git_submodule_checkout_commit OUT_VAR PATH)
     execute_process(COMMAND "${git_PROGRAM}" submodule status --cached "${PATH}"
                     OUTPUT_VARIABLE _git_result
@@ -268,6 +273,40 @@ endmacro()
 macro(exit_if_included)
     if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         return()
+    endif()
+endmacro()
+
+macro(find_t1)
+    set(t1_FOUND FALSE)
+    unset(t1_BASE_DIR)
+
+    if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND DEFINED Tests)
+        if (EXISTS "${CMAKE_SOURCE_DIR}/ext/t1" AND
+            NOT EXISTS "${CMAKE_SOURCE_DIR}/ext/t1/cmake/t1Config.cmake")
+            execute_process(COMMAND "${git_PROGRAM}" submodule update --init "${CMAKE_SOURCE_DIR}/ext/t1"
+                            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}") 
+        endif()
+
+        find_package(t1 QUIET PATHS "${CMAKE_SOURCE_DIR}/ext/t1/cmake" NO_DEFAULT_PATH)
+
+        if (t1_FOUND)
+            set(t1_BASE_DIR "${CMAKE_SOURCE_DIR}/ext/t1")
+        else()
+            if (EXISTS "${Tests}" AND IS_DIRECTORY "${Tests}")
+                find_package(t1 QUIET PATHS "${Tests}" NO_DEFAULT_PATH)
+            endif()
+
+            if (t1_FOUND)
+                set(t1_BASE_DIR "${Tests}")
+            else()
+                find_package(t1 QUIET)
+                unset(t1_BASE_DIR)
+            endif()
+        endif()
+
+        if (DEFINED t1_BASE_DIR)
+            set(t1_SOURCE_DIR "${t1_BASE_DIR}/src")
+        endif()
     endif()
 endmacro()
 
@@ -792,7 +831,8 @@ macro(add_target_compile_flags TARGET)
     
     if (_ADD_TARGET_COMPILE_FLAGS_Default)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-            # TODO
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-exceptions")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-rtti")
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # TODO
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -1438,13 +1478,13 @@ macro(add_lib NAME LINKAGE)
             install_library(TARGET "${_NAME}" SOURCES_DIR "${${_NAME}_SOURCES_DIR}")
 
             if (DEFINED ADD_LIB_TESTS)
-                find_package(t1 QUIET)
+                find_t1()
 
                 if (t1_FOUND)
                     foreach (_TEST ${ADD_LIB_TESTS})
                         if (IS_DIRECTORY "${_TEST}")
                             add_test_directory("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS} "${t1_SOURCE_DIR}"
                                 COMPILE_FLAGS ${${_NAME}_TESTS_COMPILE_FLAGS}
                                 LINK_FLAGS ${${_NAME}_TESTS_LINK_FLAGS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
@@ -1453,7 +1493,7 @@ macro(add_lib NAME LINKAGE)
                                 )
                         else()
                             add_t1_test("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS} "${t1_SOURCE_DIR}"
                                 COMPILE_FLAGS ${${_NAME}_TESTS_COMPILE_FLAGS}
                                 LINK_FLAGS ${${_NAME}_TESTS_LINK_FLAGS}
                                 LIBRARIES ${_NAME} ${${_NAME}_LIBRARIES}
@@ -1539,13 +1579,13 @@ macro(add_exe NAME)
             install_executable(TARGET "${_NAME}" NAME "${NAME}")
 
             if (DEFINED ADD_EXE_TESTS)
-                find_package(t1 QUIET)
+                find_t1()
 
                 if (t1_FOUND)
                     foreach (_TEST ${ADD_EXE_TESTS})
                         if (IS_DIRECTORY "${_TEST}")
                             add_test_directory("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS} "${t1_SOURCE_DIR}"
                                 LIBRARIES ${${_NAME}_LIBRARIES}
                                 COMPILE_FLAGS ${${_NAME}_TESTS_COMPILE_FLAGS}
                                 LINK_FLAGS ${${_NAME}_TESTS_LINK_FLAGS}
@@ -1554,7 +1594,7 @@ macro(add_exe NAME)
                                 )
                         else()
                             add_t1_test("${_TEST}"
-                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS}
+                                INCLUDE_DIRS "${${_NAME}_SOURCES_DIR}" ${${_NAME}_INCLUDE_DIRS} "${t1_SOURCE_DIR}"
                                 LIBRARIES ${${_NAME}_LIBRARIES}
                                 COMPILE_FLAGS ${${_NAME}_TESTS_COMPILE_FLAGS}
                                 LINK_FLAGS ${${_NAME}_TESTS_LINK_FLAGS}

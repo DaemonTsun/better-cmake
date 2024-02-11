@@ -57,7 +57,7 @@ add_lib(NAME LINKAGE
     [VERSION version]
     [SOURCES_DIR dir]             # top directory of all source files, if "src" folder is present, can be omitted
     [GENERATE_TARGET_HEADER file] # path to target header file
-    [CPP_VERSION version]         # defaults to 17 if omitted
+    [CPP_VERSION version]         # defaults to 20 if omitted
         
     [CPP_WARNINGS warnings...]  # ALL, EXTRA, PEDANTIC or normal compiler args
     [TESTS tests...]            # t1 tests or directories of tests
@@ -76,7 +76,7 @@ add_exe(NAME
     [VERSION version]
     [SOURCES_DIR dir]             # top directory of all source files, if "src" folder is present, can be omitted
     [GENERATE_TARGET_HEADER file] # path to target header file
-    [CPP_VERSION version]         # defaults to 17 if omitted
+    [CPP_VERSION version]         # defaults to 20 if omitted
     [WINDOWS_SUBSYSTEM subsystem] # only "console" and "windows" are available thanks to CMake. Does not affect systems other than Windows.
         
     [CPP_WARNINGS warnings...]  # ALL, EXTRA, PEDANTIC or normal compiler args
@@ -92,7 +92,7 @@ add_exe(NAME
 )
 ```
 
-Options marked with a `@` may also use the platform syntax for adding options only for specific operating systems, e.g.:
+Options marked with a `@` may also use the platform or compiler syntax for adding options only for specific operating systems or compilers, e.g.:
 
 ```cmake
 add_exe(my_cool_exe
@@ -103,5 +103,15 @@ add_exe(my_cool_exe
         zlib
         @Linux pthread x11
         @Windows kernel32 user32
+)
+```
+
+### Tests
+
+When using [t1](https://github.com/daemontsun/t1) for tests, setting the `Tests` CMake variable before including `better-cmake`, or specifying `-DTests=1` in the `cmake` command, will enable building `t1` tests for the build. Example:
+
+```sh
+$ cmake -DBuild=Debug -DTests=1 ..
+$ make tests && make runtests
 ```
 
