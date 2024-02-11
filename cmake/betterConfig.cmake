@@ -1618,7 +1618,7 @@ endmacro()
 if (Windows)
     if (Compiler STREQUAL "MSVC"
             OR (NOT DEFINED Compiler AND (NOT DEFINED CMAKE_C_COMPILER OR NOT DEFINED CMAKE_CXX_COMPILER))
-        OR CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L).exe$")
+            OR (CMAKE_C_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$" OR CMAKE_CXX_COMPILER MATCHES ".*(c|C)(l|L)(.exe)$"))
 
         set_cache(Compiler "MSVC")
         # time to set "developer prompt" variables manually
