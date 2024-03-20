@@ -544,9 +544,9 @@ macro(get_cpp_warnings OUT_VAR)
 
     if (TARGET_CPP_WARNINGS_SANE)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-            list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar)
+            list(APPEND ${OUT_VAR} -Wno-unused-but-set-variable -Wno-multichar)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-            list(APPEND ${OUT_VAR} -Wno-sign-compare -Wno-unused-but-set-variable -Wno-multichar -Wno-missing-braces)
+            list(APPEND ${OUT_VAR} -Wno-unused-but-set-variable -Wno-multichar -Wno-missing-braces)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
             # Suppressed warnings:
             list(APPEND ${OUT_VAR}
@@ -567,7 +567,7 @@ macro(get_cpp_warnings OUT_VAR)
                 "/wd5039" # C5039: extern C exceptions
                 "/wd5045" # C5045: spectre
                 "/wd5246" # C5246: initialization of subobjects should be wrapped in braces
-                "/wd5262" # C5262: implicit case fall-through
+                # "/wd5262" # C5262: implicit case fall-through
             )
         endif()
     endif()
