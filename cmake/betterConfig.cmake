@@ -574,7 +574,7 @@ macro(get_cpp_warnings OUT_VAR)
 
     if (TARGET_CPP_WARNINGS_FATAL)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-            list(APPEND ${OUT_VAR} -Wfatal-errors)
+            list(APPEND ${OUT_VAR} -Werror -Wfatal-errors)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
             list(APPEND ${OUT_VAR} "/WX")
         endif()
