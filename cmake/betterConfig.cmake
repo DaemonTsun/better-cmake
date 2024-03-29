@@ -567,7 +567,7 @@ macro(get_cpp_warnings OUT_VAR)
                 "/wd5039" # C5039: extern C exceptions
                 "/wd5045" # C5045: spectre
                 "/wd5246" # C5246: initialization of subobjects should be wrapped in braces
-                # "/wd5262" # C5262: implicit case fall-through
+                "/wd5262" # C5262: implicit case fall-through, THIS IS BROKEN, DO NOT ENABLE
             )
         endif()
     endif()
