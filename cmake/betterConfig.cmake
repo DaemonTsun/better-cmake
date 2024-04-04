@@ -792,6 +792,64 @@ macro(_add_target_submodules TARGET)
     endforeach()
 endmacro()
 
+macro(set_target_sources_dir TARGET PATH)
+    set("${TARGET}_SOURCES_DIR" "${PATH}")
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS EXCLUDING)
+
+    cmake_parse_arguments(_SET_TARGET_SOURCES_DIR "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+
+    find_sources("${TARGET}_SOURCES" "${PATH}")
+    find_headers("${TARGET}_HEADERS" "${PATH}")
+
+    if (DEFINED _SET_TARGET_SOURCES_DIR_EXCLUDING)
+        foreach (_EXC ${_SET_TARGET_SOURCES_DIR_EXCLUDING})
+            list(FILTER ${TARGET}_SOURCES EXCLUDE REGEX "${_EXC}.*")
+            # list(FILTER ${TARGET}_HEADERS EXCLUDE REGEX "${_EXC}.*")
+        endforeach()
+    endif()
+endmacro()
+
+
+# add_target_sources: add sources to a given target. 
+# Directories will be searched for source files.
+# supports platform-specific source selection with @,
+# example:
+#   add_target_sources("${ROOT}/src"
+#                      "${ROOT}/somelib/main.c"
+#                      @Linux "${ROOT}/linuxsrc")
+#
+macro(add_target_sources TARGET)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS)
+    set(_MULTI_VAL_ARGS @Linux @Windows @Mac)
+
+    cmake_parse_arguments(_ADD_TARGET_SOURCES "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+    
+    unset(_ADD_TARGET_SOURCES_FILES)
+    if (DEFINED _ADD_TARGET_SOURCES_UNPARSED_ARGUMENTS)
+        list(APPEND _ADD_TARGET_SOURCES_FILES ${_ADD_TARGET_SOURCES_UNPARSED_ARGUMENTS})
+    endif()
+
+    if (DEFINED "_ADD_TARGET_SOURCES_\@${Platform}")
+        list(APPEND _ADD_TARGET_SOURCES_FILES ${_ADD_TARGET_SOURCES_\@${Platform}})
+    endif()
+
+    foreach (_SOURCE_TO_ADD ${_ADD_TARGET_SOURCES_FILES})
+        if (IS_DIRECTORY "${_SOURCE_TO_ADD}")
+            unset(_TMP_FIND)
+            find_sources(_TMP_FIND "${_SOURCE_TO_ADD}")
+
+            if (_TMP_FIND)
+                list(APPEND "${TARGET}_SOURCES" ${_TMP_FIND})
+            endif()
+        else()
+            list(APPEND "${TARGET}_SOURCES" ${_SOURCE_TO_ADD})
+        endif()
+    endforeach()
+endmacro()
+
 # add_target_libraries: add libraries to link for a given target.
 # supports platform-specific library selection with @,
 # example:
@@ -1214,12 +1272,12 @@ macro(_add_target NAME)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS
         VERSION                 # version of the target
-        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
         CPP_VERSION             # defaults to 17 if omitted
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
+        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
         COMPILE_FLAGS           # compiler flags
@@ -1262,22 +1320,24 @@ macro(_add_target NAME)
     if (NOT DEFINED _ADD_TARGET_SOURCES_DIR)
         if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/")
             message(VERBOSE "better-cmake: using default source directory ${CMAKE_CURRENT_SOURCE_DIR}/src/")
-            set(${_NAME}_SOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+            set_target_sources_dir(${_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/src/")
         else()
             message(FATAL_ERROR "better-cmake: add_lib/add_exe requires parameter SOURCES_DIR")
         endif()
     else()
         set(${_NAME}_SOURCES_DIR "${_ADD_TARGET_SOURCES_DIR}")
+        set_target_sources_dir(${_NAME} ${_ADD_TARGET_SOURCES_DIR})
     endif()
 
     if (DEFINED _ADD_TARGET_GENERATE_TARGET_HEADER)
         generate_target_header("${NAME}" "${_NAME}" "${_ADD_TARGET_GENERATE_TARGET_HEADER}")
     endif()
 
-    find_sources("${_NAME}_SOURCES" "${${_NAME}_SOURCES_DIR}")
-    find_headers("${_NAME}_HEADERS" "${${_NAME}_SOURCES_DIR}")
+    if (DEFINED _ADD_TARGET_SOURCES)
+        add_target_sources(${_NAME} ${_ADD_TARGET_SOURCES})
+    endif()
 
-    target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES} ${_ADD_TARGET_SOURCES})
+    target_sources(${_NAME} PRIVATE ${${_NAME}_HEADERS} ${${_NAME}_SOURCES})
 
     if (NOT DEFINED _ADD_TARGET_CPP_VERSION)
         set(_ADD_TARGET_CPP_VERSION ${better_DEFAULT_CXX_STANDARD})
@@ -1430,12 +1490,12 @@ macro(add_lib NAME LINKAGE)
     set(_OPTIONS PIE)
     set(_SINGLE_VAL_ARGS
         VERSION                 # version of the target
-        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
         CPP_VERSION             # defaults to 17 if omitted
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
+        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
         COMPILE_FLAGS           # compiler flags
@@ -1523,7 +1583,6 @@ macro(add_exe NAME)
     set(_OPTIONS)
     set(_SINGLE_VAL_ARGS
         VERSION                 # version of the target
-        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         GENERATE_TARGET_HEADER  # path to target header file
         CPP_VERSION             # defaults to 17 if omitted
         WINDOWS_SUBSYSTEM       # Windows subsystem, defaults to "console".
@@ -1532,6 +1591,7 @@ macro(add_exe NAME)
         )
     set(_MULTI_VAL_ARGS
         CPP_WARNINGS            # ALL, EXTRA, PEDANTIC
+        SOURCES_DIR             # top directory of all source files, if "src" folder is present, can be omitted
         SOURCES                 # extra sources, optional
         INCLUDE_DIRS            # extra include directories, optional
         COMPILE_FLAGS           # compiler flags
