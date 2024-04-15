@@ -805,6 +805,7 @@ macro(set_target_sources_dir TARGET PATH)
 
     if (DEFINED _SET_TARGET_SOURCES_DIR_EXCLUDING)
         foreach (_EXC ${_SET_TARGET_SOURCES_DIR_EXCLUDING})
+            string(REGEX REPLACE "([][+.*()^])" "[\\1]" _EXC "${_EXC}")
             list(FILTER ${TARGET}_SOURCES EXCLUDE REGEX "${_EXC}.*")
             # list(FILTER ${TARGET}_HEADERS EXCLUDE REGEX "${_EXC}.*")
         endforeach()
