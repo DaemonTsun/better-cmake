@@ -897,9 +897,10 @@ macro(add_target_compile_flags TARGET)
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-asynchronous-unwind-tables")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-exceptions")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-rtti")
-            list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wl,--gc-sections")
-            list(APPEND "${TARGET}_COMPILE_FLAGS" "-fdata-sections")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-char8_t")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-stack-protector")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-fdata-sections")
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wl,--gc-sections")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wa,--noexecstack")
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # TODO
@@ -950,6 +951,9 @@ macro(add_target_compile_flags TARGET)
             # https://learn.microsoft.com/en-us/cpp/build/reference/fp-specify-floating-point-behavior?view=msvc-170
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/fp:fast")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/fp:except-")
+
+            # Disable char8_t
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/Zc:char8_t-")
         endif()
     endif()
     
