@@ -954,6 +954,9 @@ macro(add_target_compile_flags TARGET)
 
             # Disable char8_t
             list(APPEND "${TARGET}_COMPILE_FLAGS" "/Zc:char8_t-")
+
+            # UTF-8 source and execution
+            list(APPEND "${TARGET}_COMPILE_FLAGS" "/utf-8")
         endif()
     endif()
     
