@@ -73,8 +73,6 @@ macro(set_export VAR)
     endif()
 endmacro()
 
-
-
 # platform vars
 if (WIN32)
     set_cache(Windows 1)
@@ -187,6 +185,63 @@ macro(get_deepest_common_parent_path OUT_VAR)
     set(${OUT_VAR} "${_PARENT}")
 endmacro()
 
+macro(id IN_VAR OUT_VAR)
+    set(${OUT_VAR} ${${IN_VAR}})
+endmacro()
+
+# iterates through FILES parameters with CALLBACK function, relative to the greatest
+# common path between FILEs and DESTINATION, or BASE if BASE is set.
+# iterate_relative_files(message OUT_FILES
+#                        DESTINATION "./bin"
+#                        BASE "./bin"
+#                        "./src/testfile.txt"
+#                        "./src/dir/file.bin")
+# prints:
+# ./src/testfile.txt ./bin/testfile.txt
+# ./src/dir/file.bin ./bin/dir/file.bin
+#
+# and OUT_FILES will have ./bin/testfile.txt ./bin/dir/file.bin
+#
+# optionally the BEFORE, BETWEEN and AFTER multi value parameters may be set to
+# insert static parameters between the file parameters
+macro(iterate_relative_files CALLBACK OUT_FILES)
+    set(_OPTIONS)
+    set(_SINGLE_VAL_ARGS DESTINATION BASE TRANSFORM)
+    set(_MULTI_VAL_ARGS FILES BEFORE BETWEEN AFTER)
+
+    cmake_parse_arguments(ITERATE_RELATIVE_FILES "${_OPTIONS}" "${_SINGLE_VAL_ARGS}" "${_MULTI_VAL_ARGS}" ${ARGN})
+
+    if (NOT DEFINED ITERATE_RELATIVE_FILES_FILES)
+        message(FATAL_ERROR "iterate_relative_files: missing FILES")
+    endif()
+
+    if (NOT DEFINED ITERATE_RELATIVE_FILES_DESTINATION)
+        message(FATAL_ERROR "iterate_relative_files: missing DESTINATION")
+    endif()
+
+    if (NOT DEFINED ITERATE_RELATIVE_FILES_BASE)
+        get_deepest_common_parent_path(ITERATE_RELATIVE_FILES_BASE ${ITERATE_RELATIVE_FILES_FILES} "${ITERATE_RELATIVE_FILES_DESTINATION}")
+    endif()
+
+    if (NOT DEFINED ITERATE_RELATIVE_FILES_TRANSFORM)
+        set(ITERATE_RELATIVE_FILES_TRANSFORM id)
+    endif()
+
+    file(MAKE_DIRECTORY "${ITERATE_RELATIVE_FILES_BASE}")
+
+    foreach(_FILE ${ITERATE_RELATIVE_FILES_FILES})
+        cmake_path(RELATIVE_PATH _FILE BASE_DIRECTORY "${ITERATE_RELATIVE_FILES_BASE}" OUTPUT_VARIABLE _REL_FILE)
+        set(_OUT_FILE "${ITERATE_RELATIVE_FILES_DESTINATION}/${_REL_FILE}")
+        cmake_path(GET _OUT_FILE PARENT_PATH _PARENT)
+
+        file(MAKE_DIRECTORY "${_PARENT}")
+        
+        cmake_language(CALL ${ITERATE_RELATIVE_FILES_TRANSFORM} _OUT_FILE _OUT_FILE)
+        cmake_language(CALL ${CALLBACK} ${ITERATE_RELATIVE_FILES_BEFORE} ${_FILE} ${ITERATE_RELATIVE_FILES_BETWEEN} ${_OUT_FILE} ${ITERATE_RELATIVE_FILES_AFTER})
+        list(APPEND ${OUT_FILES} "${_OUT_FILE}")
+    endforeach()
+endmacro()
+
 # used internally
 macro(_copy_files_base DO_TARGET TARGET_VAR)
     set(_OPTIONS)
@@ -207,7 +262,7 @@ macro(_copy_files_base DO_TARGET TARGET_VAR)
         get_deepest_common_parent_path(COPY_FILES_BASE_BASE ${COPY_FILES_BASE_FILES} "${COPY_FILES_BASE_DESTINATION}")
     endif()
 
-    file(MAKE_DIRECTORY "${DEST_DIR}")
+    file(MAKE_DIRECTORY "${COPY_FILES_BASE_BASE}")
 
     foreach(_FILE ${COPY_FILES_BASE_FILES})
         cmake_path(RELATIVE_PATH _FILE BASE_DIRECTORY "${COPY_FILES_BASE_BASE}" OUTPUT_VARIABLE _REL_FILE)
