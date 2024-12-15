@@ -957,7 +957,12 @@ macro(add_target_compile_flags TARGET)
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fno-stack-protector")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-fdata-sections")
             list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wl,--gc-sections")
-            list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wa,--noexecstack")
+
+            # w64devkit 'as' doesn't support --noexecstack?
+            if (WIN32)
+            else()
+                list(APPEND "${TARGET}_COMPILE_FLAGS" "-Wa,--noexecstack")
+            endif()
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # TODO
         elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
