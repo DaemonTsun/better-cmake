@@ -599,7 +599,10 @@ macro(get_cpp_warnings OUT_VAR)
 
     if (TARGET_CPP_WARNINGS_SANE)
         if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-            list(APPEND ${OUT_VAR} -Wno-unused-but-set-variable -Wno-multichar -Wno-builtin-declaration-mismatch)
+            list(APPEND ${OUT_VAR} -Wno-unused-but-set-variable
+                                   -Wno-multichar
+                                   -Wno-builtin-declaration-mismatch
+                                   -Wno-address)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
             list(APPEND ${OUT_VAR} -Wno-unused-but-set-variable -Wno-multichar -Wno-missing-braces)
         elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
